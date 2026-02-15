@@ -295,3 +295,97 @@ pub fn check_proxy_trust(
         Ok(None)
     }
 }
+
+/// Hook: scan an inbound user/channel message through the ConversationIO guard.
+/// Returns Ok(Ok(record)) if the message is allowed, Ok(Err(record)) if blocked.
+pub fn on_message_input(
+    agent_id: &str,
+    session_id: &str,
+    principal: Principal,
+    taint: TaintFlags,
+    content: &str,
+    parent_records: Vec<String>,
+) -> io::Result<Result<TypedRecord, TypedRecord>> {
+    let g = guard::Guard::load_default()?;
+    let (verdict, scan_result, decision_record) = g.check_conversation_input(
+        principal,
+        taint,
+        content,
+        session_id,
+        parent_records.clone(),
+    )?;
+
+    match verdict {
+        GuardVerdict::Allow => {
+            // Record the message as a session message
+            let mut meta = RecordMeta::now();
+            meta.agent_id = Some(agent_id.to_string());
+            meta.session_id = Some(session_id.to_string());
+
+            let scanner_taint = crate::types::TaintFlags::from_bits(scan_result.taint_flags)
+                .unwrap_or(TaintFlags::empty());
+
+            let payload = json!({
+                "direction": "inbound",
+                "content_length": content.len(),
+                "scan_verdict": format!("{:?}", scan_result.verdict),
+            });
+
+            let record = records::emit_record(
+                RecordType::SessionMessage,
+                principal,
+                taint | scanner_taint,
+                vec![decision_record.record_id.clone()],
+                meta,
+                payload,
+            )?;
+            audit_chain::emit_audit(&record.record_id)?;
+            Ok(Ok(record))
+        }
+        GuardVerdict::Deny => Ok(Err(decision_record)),
+    }
+}
+
+/// Hook: scan an outbound LLM response through the output guard.
+/// Returns Ok(Ok(record)) if the output is safe, Ok(Err(record)) if leakage detected.
+pub fn on_message_output(
+    agent_id: &str,
+    session_id: &str,
+    content: &str,
+    output_guard_config: Option<&crate::output_guard::OutputGuardConfig>,
+    parent_records: Vec<String>,
+) -> io::Result<Result<TypedRecord, TypedRecord>> {
+    let g = guard::Guard::load_default()?;
+    let (safe, _scan_result, decision_record) = g.check_conversation_output(
+        content,
+        session_id,
+        output_guard_config,
+        parent_records.clone(),
+    )?;
+
+    if safe {
+        // Record the outbound message
+        let mut meta = RecordMeta::now();
+        meta.agent_id = Some(agent_id.to_string());
+        meta.session_id = Some(session_id.to_string());
+
+        let payload = json!({
+            "direction": "outbound",
+            "content_length": content.len(),
+            "output_safe": true,
+        });
+
+        let record = records::emit_record(
+            RecordType::SessionMessage,
+            Principal::Sys,
+            TaintFlags::empty(),
+            vec![decision_record.record_id.clone()],
+            meta,
+            payload,
+        )?;
+        audit_chain::emit_audit(&record.record_id)?;
+        Ok(Ok(record))
+    } else {
+        Ok(Err(decision_record))
+    }
+}

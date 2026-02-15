@@ -73,6 +73,8 @@ pub struct ProtectionSummary {
     pub cpi_violations_blocked: u64,
     /// Total MI violations blocked.
     pub mi_violations_blocked: u64,
+    /// Total conversation I/O threats blocked (injection + leakage).
+    pub conversation_threats_blocked: u64,
     /// Total taint-based blocks.
     pub taint_blocks: u64,
     /// Total proxy misconfigurations detected.
@@ -161,6 +163,7 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
     let mut mi_blocked = 0u64;
     let mut taint_blocks = 0u64;
     let mut proxy_misconfigs = 0u64;
+    let mut conversation_blocked = 0u64;
     let mut critical = 0u64;
     let mut high = 0u64;
     let mut medium = 0u64;
@@ -185,6 +188,11 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
             }
             ThreatCategory::TaintBlock => taint_blocks += 1,
             ThreatCategory::ProxyMisconfig => proxy_misconfigs += 1,
+            ThreatCategory::PromptExtraction | ThreatCategory::PromptLeakage => {
+                if alert.blocked {
+                    conversation_blocked += 1;
+                }
+            }
             _ => {}
         }
 
@@ -220,6 +228,7 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
         total_threats_blocked: total_blocked,
         cpi_violations_blocked: cpi_blocked,
         mi_violations_blocked: mi_blocked,
+        conversation_threats_blocked: conversation_blocked,
         taint_blocks,
         proxy_misconfigs_detected: proxy_misconfigs,
         critical_alerts: critical,
@@ -301,6 +310,7 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     out.push_str(&format!("  Threats Blocked:         {}\n", p.total_threats_blocked));
     out.push_str(&format!("  CPI Violations Blocked:  {}\n", p.cpi_violations_blocked));
     out.push_str(&format!("  MI Violations Blocked:   {}\n", p.mi_violations_blocked));
+    out.push_str(&format!("  Conversation Blocked:    {}\n", p.conversation_threats_blocked));
     out.push_str(&format!("  Taint Blocks:            {}\n", p.taint_blocks));
     out.push_str(&format!("  Proxy Misconfigs:        {}\n", p.proxy_misconfigs_detected));
     out.push_str(&format!(

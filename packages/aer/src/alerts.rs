@@ -50,6 +50,10 @@ pub enum ThreatCategory {
     RateLimitExceeded,
     /// Injection attempt suspected.
     InjectionSuspect,
+    /// System prompt extraction attempt blocked.
+    PromptExtraction,
+    /// System prompt leakage detected in output.
+    PromptLeakage,
 }
 
 impl std::fmt::Display for ThreatCategory {
@@ -61,6 +65,8 @@ impl std::fmt::Display for ThreatCategory {
             ThreatCategory::ProxyMisconfig => write!(f, "PROXY_MISCONFIG"),
             ThreatCategory::RateLimitExceeded => write!(f, "RATE_LIMIT_EXCEEDED"),
             ThreatCategory::InjectionSuspect => write!(f, "INJECTION_SUSPECT"),
+            ThreatCategory::PromptExtraction => write!(f, "PROMPT_EXTRACTION"),
+            ThreatCategory::PromptLeakage => write!(f, "PROMPT_LEAKAGE"),
         }
     }
 }
@@ -289,6 +295,8 @@ fn classify_severity(category: ThreatCategory, decision: &GuardDecisionDetail) -
         ThreatCategory::ProxyMisconfig => AlertSeverity::High,
         ThreatCategory::RateLimitExceeded => AlertSeverity::Critical,
         ThreatCategory::InjectionSuspect => AlertSeverity::Critical,
+        ThreatCategory::PromptExtraction => AlertSeverity::Critical,
+        ThreatCategory::PromptLeakage => AlertSeverity::Critical,
     }
 }
 
@@ -326,6 +334,16 @@ fn format_summary(
             "CRITICAL: Injection attempt suspected from {:?} targeting '{}'. \
              Taint flags: {:?}.",
             decision.principal, target, decision.taint
+        ),
+        ThreatCategory::PromptExtraction => format!(
+            "CRITICAL: System prompt extraction attempt blocked from {:?} targeting '{}'. \
+             Taint flags: {:?}.",
+            decision.principal, target, decision.taint
+        ),
+        ThreatCategory::PromptLeakage => format!(
+            "CRITICAL: System prompt leakage detected in outbound response for '{}'. \
+             Rule '{}' blocked the response.",
+            target, decision.rule_id
         ),
     }
 }
