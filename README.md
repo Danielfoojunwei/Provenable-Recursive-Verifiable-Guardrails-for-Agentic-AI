@@ -194,13 +194,39 @@ fuzz/                 # Fuzz testing targets
 
 ## Documentation
 
-- [AEGX v0.1 Format Specification](docs/SPEC.md)
-- [Threat Model](docs/THREAT_MODEL.md)
-- [Changelog](docs/CHANGELOG.md)
-- [AER Bundle Format](docs/aer-bundle-format.md)
-- [AER Threat Model](docs/aer-threat-model.md)
-- [AER Usage Guide](docs/aer-usage.md)
-- [CPI/MI Guard Rules](docs/aer-cpi-mi-rules.md)
+### Getting Started
+
+| Guide | Audience | Description |
+|-------|----------|-------------|
+| [Installation Guide](docs/INSTALL.md) | Everyone | Prerequisites, build, install, platform notes |
+| [Quickstart Tutorial](docs/QUICKSTART.md) | Everyone | Create your first bundle in 5 minutes |
+| [CLI Reference](docs/CLI_REFERENCE.md) | Everyone | Every command, flag, and exit code for both CLIs |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Everyone | Common errors and how to fix them |
+
+### For Agent Developers
+
+| Guide | Description |
+|-------|-------------|
+| [Agent Integration Guide](docs/AGENT_INTEGRATION.md) | Step-by-step integration for AI agents and pipelines |
+| [AER Usage Guide](docs/aer-usage.md) | AER runtime operations (guards, snapshots, rollback) |
+| [CPI/MI Guard Rules](docs/aer-cpi-mi-rules.md) | Trust lattice, taint model, policy customization |
+
+### Technical Reference
+
+| Document | Description |
+|----------|-------------|
+| [AEGX v0.1 Format Specification](docs/SPEC.md) | Formal specification of the bundle format |
+| [Bundle Format Guide](docs/BUNDLE_FORMAT_GUIDE.md) | Visual walkthrough of every file in a bundle |
+| [Verification Guide](docs/VERIFICATION_GUIDE.md) | What verify checks and how to interpret results |
+| [AER Bundle Format](docs/aer-bundle-format.md) | AER-specific bundle extensions |
+
+### Security
+
+| Document | Description |
+|----------|-------------|
+| [Threat Model](docs/THREAT_MODEL.md) | AEGX security analysis and mitigations |
+| [AER Threat Model](docs/aer-threat-model.md) | AER security guarantees and assumptions |
+| [Changelog](docs/CHANGELOG.md) | Release notes |
 
 ## License
 
