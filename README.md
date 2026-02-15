@@ -139,7 +139,30 @@ detectors. Critical/High findings block installation; Medium findings require
 explicit user approval. 16 tests validate detection of all attack vectors with
 zero false positives on legitimate skills.
 
-### Outcome 6: Self-Contained Portable Evidence
+### Outcome 6: Automated Recovery & Agent Notification (v0.1.4)
+
+Three automated rollback mechanisms ensure the system can detect, recommend,
+and execute recovery without manual intervention:
+
+1. **Auto-Snapshot Before CPI Changes** — Every allowed control-plane mutation
+   (skill install, permission change, etc.) creates a pre-change snapshot
+   automatically, ensuring rollback is always possible.
+2. **Rollback Recommendation** — When 3+ guard denials occur within 2 minutes,
+   the system emits a `RollbackRecommended` alert with the snapshot target and
+   CLI command. The agent relays this to the user.
+3. **Threshold-Based Auto-Rollback** — When 5+ denials occur within 2 minutes,
+   the system automatically rolls back to the most recent snapshot, emits a
+   `CRITICAL` alert, and the agent immediately notifies the user.
+
+Additionally, **RVU contamination scope computation** traces the provenance
+DAG from any contaminated record to find all downstream records that may be
+affected, enabling targeted review or rollback.
+
+**Concrete guarantee:** The `/prove` endpoint includes `rollback_status` with
+`agent_messages` that the agent MUST relay to the user. Every auto-rollback
+and contamination event is recorded as tamper-evident evidence.
+
+### Outcome 7: Self-Contained Portable Evidence
 
 Bundles are self-contained directories (or `.aegx.zip` archives) containing
 everything needed for independent, offline verification. No network access, no
@@ -199,6 +222,14 @@ theorem. The table below shows the exact mapping:
 | Typosquatting detection          | CPI                             | Name similarity attacks (V6)            |
 | MI write guard at runtime        | MI Theorem                      | Memory poisoning blocked structurally — **V4 fully prevented** |
 
+| Automated Recovery (v0.1.4)        | Theorem(s)                      | What It Provides                        |
+|------------------------------------|---------------------------------|-----------------------------------------|
+| Auto-snapshot before CPI           | RVU Machine Unlearning          | Every CPI mutation has a rollback point |
+| Rollback recommendation (3+ denials) | RVU + All four theorems       | Agent alerts user with snapshot target and CLI command |
+| Auto-rollback (5+ denials)         | RVU Machine Unlearning          | Automatic recovery when attack burst detected |
+| Contamination scope computation    | RVU Machine Unlearning          | Transitive closure identifies all affected downstream records |
+| MI read-side taint tracking        | MI + Noninterference            | Untrusted readers get tainted provenance, preventing laundering |
+
 ---
 
 ## Empirical Validation: ZeroLeaks Benchmark
@@ -209,14 +240,16 @@ our ConversationIO guard using the actual scanner and output guard code.
 
 ### Results (Worst-Case: USER Principal, Input Scanner Only)
 
-| Metric                     | Before (No Guards) | v0.1.1 | v0.1.2 | v0.1.3 (Current) |
-|----------------------------|--------------------|--------|--------|-------------------|
-| Extraction Success Rate    | 84.6% (11/13)      | 38.5%  | **15.4%** | **15.4% (2/13)**  |
-| Injection Success Rate     | 91.3% (21/23)      | 4.3%   | **4.3%**  | **4.3% (1/23)**   |
-| **ZLSS (1-10, lower=better)** | **10/10**       | 2/10   | **1/10**  | **1/10**          |
-| **Security Score (0-100)** | **2/100**           | 79/100 | **90/100**| **90/100**        |
-| Supply-chain (ClawHavoc)   | 0/6 vectors blocked | —      | —         | **6/6 detected**  |
-| Total tests                | —                  | 114    | 152       | **168 pass**      |
+| Metric                     | Before (No Guards) | v0.1.1 | v0.1.2 | v0.1.3 | v0.1.4 (Current) |
+|----------------------------|--------------------|--------|--------|--------|-------------------|
+| Extraction Success Rate    | 84.6% (11/13)      | 38.5%  | **15.4%** | 15.4% | **15.4% (2/13)**  |
+| Injection Success Rate     | 91.3% (21/23)      | 4.3%   | **4.3%**  | 4.3%  | **4.3% (1/23)**   |
+| **ZLSS (1-10, lower=better)** | **10/10**       | 2/10   | **1/10**  | 1/10  | **1/10**          |
+| **Security Score (0-100)** | **2/100**           | 79/100 | **90/100**| 90/100| **90/100**        |
+| Supply-chain (ClawHavoc)   | 0/6 vectors blocked | —      | —         | **6/6** | 6/6 detected    |
+| Automated recovery         | None               | —      | —         | —     | **Auto-rollback + contamination scope** |
+| MI read-side taint         | None               | —      | —         | —     | **Reader principal tracked** |
+| Total tests                | —                  | 114    | 152       | 168   | **176 pass**      |
 
 ### Layer-by-Layer Breakdown
 
@@ -276,6 +309,19 @@ attack surface that runtime guards alone cannot address. v0.1.3 adds
 | V6: Typosquatting | Levenshtein distance analysis | Flags names within edit distance ≤ 2 of popular skills |
 
 See the full analysis: [ClawHub Integration & ClawHavoc Prevention](docs/clawhub-integration.md)
+
+### Gaps Addressed in v0.1.4 (Automated Recovery & Theorem Gap Closures)
+
+Six theorem execution gaps were identified and fixed:
+
+| Gap | Theorem | Fix |
+|-----|---------|-----|
+| No auto-snapshot before CPI changes | RVU | `auto_snapshot_before_cpi()` creates rollback point before every allowed CPI mutation |
+| No rollback recommendation on denial | RVU | `on_guard_denial()` emits `RollbackRecommended` alert at 3+ denials |
+| No threshold-based auto-rollback | RVU | Auto-rollback at 5+ denials in 120s, `CRITICAL` alert emitted |
+| No contamination scope computation | RVU | `compute_contamination_scope()` BFS on provenance DAG |
+| MI reads had clean provenance | MI/Noninterference | `read_memory_file()` tracks reader principal and applies taint |
+| Agent not notified of rollback events | All four | `/prove` includes `rollback_status.agent_messages` |
 
 ### Remaining Honest Gaps
 

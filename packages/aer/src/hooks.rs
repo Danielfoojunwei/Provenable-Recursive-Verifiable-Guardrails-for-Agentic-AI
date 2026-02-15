@@ -4,6 +4,7 @@ use crate::canonical::sha256_hex;
 use crate::config;
 use crate::guard;
 use crate::records;
+use crate::rollback_policy;
 use crate::types::*;
 use serde_json::json;
 use std::io;
@@ -132,7 +133,15 @@ pub fn on_session_message(
 
 /// Hook: gate a control-plane change (skills install, config change, etc.)
 /// This is the single chokepoint for CPI enforcement.
-/// Returns Ok(record) if allowed, Err if denied.
+///
+/// **v0.1.4**: Auto-snapshot before allowing CPI changes (RVU §2).
+/// On denial, feeds the rollback policy engine for threshold-based
+/// auto-rollback and recommendation alerts.
+///
+/// Returns Ok(Ok(record)) if allowed, Ok(Err(record)) if denied.
+/// The `agent_message` field in the denial result may contain a
+/// rollback recommendation or auto-rollback notification for the agent
+/// to relay to the user.
 pub fn on_control_plane_change(
     principal: Principal,
     taint: TaintFlags,
@@ -153,6 +162,10 @@ pub fn on_control_plane_change(
 
     match verdict {
         GuardVerdict::Allow => {
+            // RVU §2: Auto-snapshot before CPI change for recoverability
+            let _snapshot_id = rollback_policy::auto_snapshot_before_cpi(config_key)
+                .unwrap_or(None);
+
             // Emit the actual change record
             let mut meta = RecordMeta::now();
             meta.config_key = Some(config_key.to_string());
@@ -168,12 +181,34 @@ pub fn on_control_plane_change(
             audit_chain::emit_audit(&record.record_id)?;
             Ok(Ok(record))
         }
-        GuardVerdict::Deny => Ok(Err(decision_record)),
+        GuardVerdict::Deny => {
+            // Feed denial into rollback policy engine
+            let detail = GuardDecisionDetail {
+                verdict: GuardVerdict::Deny,
+                rule_id: decision_record.meta.rule_id.clone().unwrap_or_default(),
+                rationale: String::new(),
+                surface: GuardSurface::ControlPlane,
+                principal,
+                taint,
+            };
+            let _ = rollback_policy::on_guard_denial(
+                GuardSurface::ControlPlane,
+                &detail.rule_id,
+                &decision_record.record_id,
+                &detail,
+            );
+
+            Ok(Err(decision_record))
+        }
     }
 }
 
 /// Hook: gate and record a file write event (for workspace memory files).
 /// This is the single chokepoint for MI enforcement.
+///
+/// **v0.1.4**: On denial, feeds the rollback policy engine for threshold-based
+/// auto-rollback and recommendation alerts.
+///
 /// Returns Ok(record) if allowed, Err if denied.
 pub fn on_file_write(
     principal: Principal,
@@ -228,7 +263,25 @@ pub fn on_file_write(
                 audit_chain::emit_audit(&record.record_id)?;
                 Ok(Ok(record))
             }
-            GuardVerdict::Deny => Ok(Err(decision_record)),
+            GuardVerdict::Deny => {
+                // Feed denial into rollback policy engine
+                let detail = GuardDecisionDetail {
+                    verdict: GuardVerdict::Deny,
+                    rule_id: decision_record.meta.rule_id.clone().unwrap_or_default(),
+                    rationale: String::new(),
+                    surface: GuardSurface::DurableMemory,
+                    principal,
+                    taint,
+                };
+                let _ = rollback_policy::on_guard_denial(
+                    GuardSurface::DurableMemory,
+                    &detail.rule_id,
+                    &decision_record.record_id,
+                    &detail,
+                );
+
+                Ok(Err(decision_record))
+            }
         }
     } else {
         // Not a guarded memory file — allow but still record
@@ -401,6 +454,9 @@ pub fn on_skill_install(
 }
 
 /// Hook: scan an inbound user/channel message through the ConversationIO guard.
+///
+/// **v0.1.4**: On denial, feeds the rollback policy engine.
+///
 /// Returns Ok(Ok(record)) if the message is allowed, Ok(Err(record)) if blocked.
 pub fn on_message_input(
     agent_id: &str,
@@ -446,11 +502,33 @@ pub fn on_message_input(
             audit_chain::emit_audit(&record.record_id)?;
             Ok(Ok(record))
         }
-        GuardVerdict::Deny => Ok(Err(decision_record)),
+        GuardVerdict::Deny => {
+            // Feed denial into rollback policy engine
+            let detail = GuardDecisionDetail {
+                verdict: GuardVerdict::Deny,
+                rule_id: decision_record.meta.rule_id.clone().unwrap_or_default(),
+                rationale: String::new(),
+                surface: GuardSurface::ConversationIO,
+                principal,
+                taint,
+            };
+            let _ = rollback_policy::on_guard_denial(
+                GuardSurface::ConversationIO,
+                &detail.rule_id,
+                &decision_record.record_id,
+                &detail,
+            );
+
+            Ok(Err(decision_record))
+        }
     }
 }
 
 /// Hook: scan an outbound LLM response through the output guard.
+///
+/// **v0.1.4**: On leakage detection, computes RVU contamination scope and
+/// emits contamination alert so the agent can notify the user.
+///
 /// Returns Ok(Ok(record)) if the output is safe, Ok(Err(record)) if leakage detected.
 pub fn on_message_output(
     agent_id: &str,
@@ -490,6 +568,27 @@ pub fn on_message_output(
         audit_chain::emit_audit(&record.record_id)?;
         Ok(Ok(record))
     } else {
+        // RVU: Compute contamination scope for leakage source
+        if let Ok(scope) = rollback_policy::compute_contamination_scope(&decision_record.record_id) {
+            let _ = rollback_policy::emit_contamination_alert(&decision_record.record_id, &scope);
+        }
+
+        // Feed denial into rollback policy engine
+        let detail = GuardDecisionDetail {
+            verdict: GuardVerdict::Deny,
+            rule_id: decision_record.meta.rule_id.clone().unwrap_or_default(),
+            rationale: String::new(),
+            surface: GuardSurface::ConversationIO,
+            principal: Principal::Sys,
+            taint: TaintFlags::SECRET_RISK,
+        };
+        let _ = rollback_policy::on_guard_denial(
+            GuardSurface::ConversationIO,
+            &detail.rule_id,
+            &decision_record.record_id,
+            &detail,
+        );
+
         Ok(Err(decision_record))
     }
 }

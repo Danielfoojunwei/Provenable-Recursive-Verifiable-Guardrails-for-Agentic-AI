@@ -506,16 +506,18 @@ strings. The benchmark test is at `packages/aer/tests/zeroleaks_benchmark.rs`.
 
 ### 12.2 Results Summary
 
-| Layer | Metric | v0.1.1 | v0.1.2 | v0.1.3 (Current) |
-|-------|--------|--------|--------|-------------------|
-| Input Scanner | Extraction attacks blocked/tainted | 8/13 (61.5%) | **11/13 (84.6%)** | 11/13 (84.6%) |
-| Input Scanner | Injection attacks blocked/tainted | 22/23 (95.7%) | 22/23 (95.7%) | 22/23 (95.7%) |
-| Output Guard | Leaked response patterns caught | 11/11 (100%) | 11/11 (100%) | 11/11 (100%) |
-| Output Guard | False positive rate | 0% | 0% | 0% |
-| Combined | ZLSS (1-10, lower=better) | 2/10 | **1/10** | **1/10** |
-| Combined | Security Score (0-100) | 79/100 | **90/100** | **90/100** |
-| Skill Verifier | ClawHavoc attack vectors detected | — | — | **6/6** |
-| Test Suite | Total tests passing | 114 | 152 | **168** |
+| Layer | Metric | v0.1.1 | v0.1.2 | v0.1.3 | v0.1.4 (Current) |
+|-------|--------|--------|--------|--------|-------------------|
+| Input Scanner | Extraction attacks blocked/tainted | 8/13 (61.5%) | **11/13 (84.6%)** | 11/13 | 11/13 (84.6%) |
+| Input Scanner | Injection attacks blocked/tainted | 22/23 (95.7%) | 22/23 | 22/23 | 22/23 (95.7%) |
+| Output Guard | Leaked response patterns caught | 11/11 (100%) | 11/11 | 11/11 | 11/11 (100%) |
+| Output Guard | False positive rate | 0% | 0% | 0% | 0% |
+| Combined | ZLSS (1-10, lower=better) | 2/10 | **1/10** | 1/10 | **1/10** |
+| Combined | Security Score (0-100) | 79/100 | **90/100** | 90/100 | **90/100** |
+| Skill Verifier | ClawHavoc attack vectors detected | — | — | **6/6** | 6/6 |
+| Rollback Policy | Auto-recovery mechanisms | — | — | — | **3 (auto-snapshot, recommendation, auto-rollback)** |
+| MI Read-Side | Reader principal taint tracking | — | — | — | **Tracked** |
+| Test Suite | Total tests passing | 114 | 152 | 168 | **176** |
 
 ### 12.3 Theorem Coverage
 
@@ -538,14 +540,24 @@ theorem or a derived corollary:
 - **Skill Verifier**: Pre-install scanning for all 6 ClawHavoc attack vectors (CPI + Noninterference)
 - **Evidence Chain**: Every skill verification emits a tamper-evident GuardDecision record (RVU)
 
+**Automated Recovery & Theorem Gap Closures (v0.1.4):**
+- **Auto-Snapshot Before CPI**: `auto_snapshot_before_cpi()` creates rollback point before every allowed CPI mutation (RVU §2)
+- **Rollback Recommendation**: `on_guard_denial()` at 3+ denials emits recommendation alert (RVU §3)
+- **Threshold Auto-Rollback**: 5+ denials in 120s triggers automatic rollback + CRITICAL alert (RVU §4)
+- **Contamination Scope**: `compute_contamination_scope()` BFS on provenance DAG (RVU closure)
+- **MI Read-Side Taint**: `read_memory_file()` now tracks reader principal; untrusted readers get tainted provenance (MI + Noninterference conservative-union)
+- **Agent Notification**: `/prove` includes `rollback_status.agent_messages` (all four theorems)
+
 ### 12.4 Known Limitations
 
 1. Regex intent detection only — no LLM-based semantic understanding
 2. Benchmark tests individual messages — multi-turn detection verified separately
 3. Adversarial prompt evolution may outpace static regex patterns
 4. Benchmark measures detection, not LLM compliance with attacks
-5. No file-read guards — MI guards writes but not reads of sensitive files
+5. ~~No file-read guards~~ — Partially addressed (v0.1.4): MI reads now track reader principal and taint; full guard surface pending
 6. No outbound network monitoring — skills can POST data to external servers
+7. Session state is in-memory only — server restart loses crescendo detection state
+8. Auto-rollback requires a prior snapshot to exist — if no snapshot was created, auto-rollback cannot execute
 
 ## 13. References
 

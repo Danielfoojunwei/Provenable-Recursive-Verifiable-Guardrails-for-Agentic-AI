@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-02-15
+
+### Added
+
+- **Automated Rollback Policy Engine** (`rollback_policy.rs`) — Three automated
+  rollback mechanisms addressing RVU Machine Unlearning theorem gaps:
+  1. **Auto-Snapshot Before CPI Changes** — Every allowed control-plane mutation
+     now creates a rollback point (with cooldown), ensuring recoverability if an
+     approved change turns out harmful (RVU §2).
+  2. **Rollback Recommendation on Denial** — When 3+ guard denials occur within
+     120 seconds, emits a `RollbackRecommended` alert with the recommended
+     snapshot ID and CLI command for the agent to relay to the user.
+  3. **Threshold-Based Auto-Rollback** — When 5+ denials occur within 120 seconds,
+     automatically rolls back to the most recent snapshot and emits a `CRITICAL`
+     `AutoRollback` alert. The agent MUST notify the user immediately.
+- **RVU Contamination Scope Computation** (`rollback_policy::compute_contamination_scope()`)
+  — Computes the transitive closure of records contaminated by a source record.
+  Uses BFS on the provenance DAG to identify all downstream records affected by
+  a successful attack, enabling targeted review or rollback.
+- **MI Read-Side Taint Tracking** — `workspace::read_memory_file()` now accepts
+  `principal` and `taint` parameters. Untrusted principals reading protected
+  memory files get `UNTRUSTED` taint applied to the FileRead record, preventing
+  clean-provenance laundering. Previously all reads were recorded as `Principal::Sys`
+  with empty taint regardless of who was reading.
+- **Agent Alert Integration** — Three new alert categories
+  (`RollbackRecommended`, `AutoRollback`, `ContaminationDetected`) surface
+  through the `/prove` query engine. The `ProveResponse` now includes a
+  `rollback_status` field with `agent_messages` that the agent MUST relay
+  to the user.
+- **Rollback & Recovery section** in `/prove` report output showing auto-rollback
+  count, recommendations, contamination events, and ACTION REQUIRED messages.
+- 8 new unit tests for rollback policy engine (denial tracking, cooldown,
+  serialization, threshold constants).
+
+### Changed
+
+- `hooks::on_control_plane_change()` now creates auto-snapshot before allowing
+  CPI mutations and feeds denials into the rollback policy engine.
+- `hooks::on_file_write()` feeds MI denials into the rollback policy engine.
+- `hooks::on_message_input()` feeds CIO denials into the rollback policy engine.
+- `hooks::on_message_output()` computes RVU contamination scope on leakage detection
+  and feeds denials into the rollback policy engine.
+- `prove::ProveResponse` version updated to `0.1.4`.
+- Total tests: 168 → **176 pass** (8 new rollback policy tests).
+
+### Theorem Gap Closures (v0.1.4)
+
+| Gap | Theorem | Status | Fix |
+|-----|---------|--------|-----|
+| No auto-snapshot before CPI | RVU | **Addressed** | `auto_snapshot_before_cpi()` in `on_control_plane_change()` |
+| No rollback recommendation | RVU | **Addressed** | `on_guard_denial()` at threshold 3 |
+| No auto-rollback on burst | RVU | **Addressed** | `on_guard_denial()` at threshold 5 |
+| No contamination scope | RVU | **Addressed** | `compute_contamination_scope()` with BFS on DAG |
+| MI reads had clean provenance | MI/Noninterference | **Addressed** | `read_memory_file()` now tracks reader principal and taint |
+| Agent not notified of rollback | All | **Addressed** | `/prove` includes `rollback_status.agent_messages` |
+
 ## [0.1.3] - 2026-02-15
 
 ### Added

@@ -102,15 +102,17 @@ Layer 7 — Pre-Install Skill Verification (v0.1.3, CPI + Noninterference):
 
 **Empirical validation** (ZeroLeaks benchmark, no mocks — `packages/aer/tests/zeroleaks_benchmark.rs`):
 
-| Metric | Before | v0.1.1 | v0.1.2 | v0.1.3 (Current) |
-|--------|--------|--------|--------|-------------------|
-| Extraction success | 84.6% | 38.5% | **15.4%** | **15.4%** (worst-case USER) |
-| Injection success | 91.3% | 4.3% | **4.3%** | **4.3%** (worst-case USER) |
-| ZLSS (1-10) | 10/10 | 2/10 | **1/10** | **1/10** |
-| Security Score | 2/100 | 79/100 | **90/100** | **90/100** |
-| Output guard catch rate | N/A | 11/11 | 11/11 | 11/11 (100%) |
-| ClawHavoc vectors detected | 0/6 | — | — | **6/6** |
-| Total tests passing | — | 114 | 152 | **168** |
+| Metric | Before | v0.1.1 | v0.1.2 | v0.1.3 | v0.1.4 (Current) |
+|--------|--------|--------|--------|--------|-------------------|
+| Extraction success | 84.6% | 38.5% | **15.4%** | 15.4% | **15.4%** (worst-case USER) |
+| Injection success | 91.3% | 4.3% | **4.3%** | 4.3% | **4.3%** (worst-case USER) |
+| ZLSS (1-10) | 10/10 | 2/10 | **1/10** | 1/10 | **1/10** |
+| Security Score | 2/100 | 79/100 | **90/100** | 90/100 | **90/100** |
+| Output guard catch rate | N/A | 11/11 | 11/11 | 11/11 | 11/11 (100%) |
+| ClawHavoc vectors detected | 0/6 | — | — | **6/6** | 6/6 |
+| Auto-recovery | None | — | — | — | **Auto-rollback + contamination scope** |
+| MI read-side taint | None | — | — | — | **Reader principal tracked** |
+| Total tests passing | — | 114 | 152 | 168 | **176** |
 
 **Boundary**: ConversationIO does NOT protect against:
 - Novel phrasings not matching regex verb+target patterns
@@ -127,11 +129,18 @@ Layer 7 — Pre-Install Skill Verification (v0.1.3, CPI + Noninterference):
 
 **Boundary**: The chain does not prevent deletion of the entire log — it detects tampering within a chain. Physical security of the state directory is assumed.
 
-### RVU Rollback
+### RVU Rollback & Automated Recovery (v0.1.4)
 
 **Guarantee**: Snapshots capture content hashes of all files in scope. Rollback restores files to their exact snapshotted content and emits a verifiable Rollback record.
 
-**Boundary**: Rollback restores file content but cannot reverse side effects (e.g., external API calls, network traffic). Session logs are NOT rolled back (they are audit evidence).
+**v0.1.4 enhancements**:
+- **Auto-snapshot before CPI changes**: Every allowed control-plane mutation creates a rollback point with cooldown, ensuring recoverability (RVU §2)
+- **Rollback recommendation**: 3+ denials in 120s → `RollbackRecommended` alert with snapshot target and CLI command
+- **Threshold-based auto-rollback**: 5+ denials in 120s → automatic rollback to most recent snapshot + `CRITICAL` alert
+- **Contamination scope computation**: `compute_contamination_scope()` traces the provenance DAG via BFS to identify all downstream records affected by a contaminated source (RVU closure property)
+- **Agent notification**: `/prove` endpoint includes `rollback_status.agent_messages` that the agent MUST relay to the user
+
+**Boundary**: Rollback restores file content but cannot reverse side effects (e.g., external API calls, network traffic). Session logs are NOT rolled back (they are audit evidence). Auto-rollback requires a prior snapshot to exist.
 
 ## Trust Lattice
 
@@ -178,7 +187,7 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 - Availability attacks / performance degradation
 - Social engineering of legitimate users
 
-## Residual Risk After Guards (v0.1.2 + v0.1.3)
+## Residual Risk After Guards (v0.1.2 + v0.1.3 + v0.1.4)
 
 ### v0.1.2 — Conversation Guard Corollaries
 
@@ -197,8 +206,19 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 | No name collision detection | **Addressed** | Case-insensitive registry comparison at install time |
 | No typosquatting detection | **Addressed** | Levenshtein distance ≤ 2 against popular skill names |
 | Memory poisoning by skills | **Already addressed (v0.1.0)** | MI guard blocks SKILL principal writes to all memory files |
-| No file-read guards | **Not yet addressed** | MI guards writes but not reads; requires `FileRead` guard surface |
+| No file-read guards | **Partially addressed (v0.1.4)** | MI reads now track reader principal and taint; full guard surface pending |
 | No outbound network monitoring | **Not yet addressed** | AER is a reference monitor, not a network proxy |
+
+### v0.1.4 — Automated Recovery & Theorem Gap Closures
+
+| Gap | Status | Fix Applied |
+|-----|--------|-------------|
+| No auto-snapshot before CPI | **Addressed** | `rollback_policy::auto_snapshot_before_cpi()` with cooldown |
+| No rollback recommendation | **Addressed** | `on_guard_denial()` emits `RollbackRecommended` at 3+ denials |
+| No threshold-based auto-rollback | **Addressed** | Auto-rollback at 5+ denials in 120s + `CRITICAL` alert |
+| No contamination scope computation | **Addressed** | `compute_contamination_scope()` BFS on provenance DAG |
+| MI reads had clean provenance | **Addressed** | `read_memory_file()` tracks reader principal and applies taint |
+| Agent not notified of rollback | **Addressed** | `/prove` includes `rollback_status.agent_messages` |
 
 ### Remaining Residual Risks
 
