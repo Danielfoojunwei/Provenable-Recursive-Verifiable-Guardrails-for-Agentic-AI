@@ -1,0 +1,79 @@
+name: Pin OpenClaw Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'OpenClaw version to pin (X.Y.Z)'
+        required: true
+        type: string
+      set_default:
+        description: 'Also set as default version'
+        required: false
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    working-directory: installer
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pin-version:
+    name: Pin OpenClaw v${{ github.event.inputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate version format
+        run: |
+          if ! echo "${{ github.event.inputs.version }}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "ERROR: Invalid version format. Must be X.Y.Z"
+            exit 1
+          fi
+
+      - name: Pin version
+        run: |
+          ARGS="--version ${{ github.event.inputs.version }}"
+          if [ "${{ github.event.inputs.set_default }}" = "true" ]; then
+            ARGS="$ARGS --set-default"
+          fi
+          python3 scripts/pin_openclaw.py $ARGS
+
+      - name: Validate manifest after pin
+        run: python3 scripts/validate_manifest.py
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: pin openclaw v${{ github.event.inputs.version }}"
+          title: "Pin OpenClaw v${{ github.event.inputs.version }}"
+          body: |
+            Automated version pin for OpenClaw `${{ github.event.inputs.version }}`.
+
+            **Set as default:** ${{ github.event.inputs.set_default }}
+
+            ### Checklist
+            - [ ] Version verified on npm
+            - [ ] Manifest validation passes
+            - [ ] Checksums regenerated
+            - [ ] Smoke tests pass
+          branch: "pin/openclaw-${{ github.event.inputs.version }}"
+          base: main
+          labels: |
+            version-pin
+            automated
