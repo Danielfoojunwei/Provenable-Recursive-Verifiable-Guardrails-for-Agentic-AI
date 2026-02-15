@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-02-15
+
+### Added
+
+- **Agent Notification System** (`agent_notifications.rs`) — Thread-safe,
+  append-only notification store ensuring NO event is silent. Every guard
+  decision, snapshot, rollback, denial, alert, and skill verification produces
+  a human-readable notification with severity, source, message, record ID,
+  and suggested action for the agent to relay to the user.
+- 9 new unit tests for agent notification system (notify/drain, peek, capacity,
+  level filtering, serialization, convenience helpers, display formats).
+
+### Changed
+
+- **hooks.rs — Zero Silent Drops**: All `let _` drops of rollback policy results
+  replaced with proper notification dispatch via `notif::notify_denial_policy()`.
+  Auto-snapshot failures now emit `notify_auto_snapshot_failed()` instead of
+  being silently swallowed by `unwrap_or(None)`.
+- **hooks.rs — Rich Rationales**: All `GuardDecisionDetail` objects now include
+  descriptive rationale strings instead of empty strings. CPI denials explain
+  "CPI change 'X' denied for Y principal (taint: Z)". MI denials explain
+  "Memory write to 'X' denied for Y principal". CIO denials explain
+  "Inbound message from X blocked by rule Y". Output blocks explain
+  "Output blocked: N leaked tokens, M structural patterns detected".
+- **hooks.rs — Full Notification Coverage**: Every event path now emits an
+  agent notification: CPI allow/deny, MI allow/deny, CIO input block,
+  output leakage block, skill verify (all verdicts), proxy misconfig,
+  auto-snapshot success/failure, contamination scope, denial policy results.
+- **prove.rs — Agent Notifications in Response**: `ProveResponse` now includes
+  `agent_notifications: Vec<AgentNotification>` drained on each query.
+  Agent notifications appear in the formatted report under
+  "Agent Notifications" section with icons, source tags, and suggested actions.
+- **prove.rs — Expanded ProtectionSummary**: Added `auto_rollbacks`,
+  `rollback_recommendations`, `contamination_events`, `skills_verified`
+  fields to `ProtectionSummary`.
+- **prove_cmd.rs — New Category Filters**: CLI `prove` command now supports
+  filtering by EXTRACTION, LEAKAGE, ROLLBACK, AUTO_ROLLBACK, CONTAMINATION
+  categories.
+- `prove::ProveResponse` version updated to `0.1.5`.
+- Total tests: 176 → **185 pass** (9 new agent notification tests).
+
+### UX/Agent Experience Gaps Closed (v0.1.5)
+
+| Gap | Severity | Fix |
+|-----|----------|-----|
+| `let _` drops agent messages from denial policy | Critical | Replaced with `notif::notify_denial_policy()` |
+| Auto-snapshot failures silently ignored | High | `notify_auto_snapshot_failed()` emitted with suggested action |
+| Empty rationale in all denial `GuardDecisionDetail` | High | Rich format strings with principal, rule, taint context |
+| No notification for CPI/MI allows | Medium | `notify_cpi_allowed()`, `notify_mi_write_allowed()` |
+| No notification for skill verification | High | `notify_skill_verdict()` for all verdicts (allow/require/deny) |
+| Prove response missing auto-rollback/contamination/skill stats | Medium | Added to `ProtectionSummary` and formatted report |
+| Contamination alert emission failures silent | High | Error notification + fallback message |
+| CLI prove_cmd missing category filters | Medium | 5 new categories added |
+| Agent notifications not drained to prove response | Critical | `drain_notifications()` in `execute_query()` |
+
 ## [0.1.4] - 2026-02-15
 
 ### Added

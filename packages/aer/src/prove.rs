@@ -66,6 +66,10 @@ pub struct ProveResponse {
     /// The agent MUST relay these messages to the user.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rollback_status: Option<RollbackStatus>,
+    /// Pending agent notifications — messages the agent MUST relay to the user.
+    /// These are drained on read; subsequent queries will not include them.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub agent_notifications: Vec<crate::agent_notifications::AgentNotification>,
 }
 
 /// Summary of what Provenable.ai has protected.
@@ -83,6 +87,14 @@ pub struct ProtectionSummary {
     pub taint_blocks: u64,
     /// Total proxy misconfigurations detected.
     pub proxy_misconfigs_detected: u64,
+    /// Total auto-rollbacks executed.
+    pub auto_rollbacks: u64,
+    /// Total rollback recommendations issued.
+    pub rollback_recommendations: u64,
+    /// Total contamination events detected.
+    pub contamination_events: u64,
+    /// Total skill verifications performed.
+    pub skills_verified: u64,
     /// Critical alerts count.
     pub critical_alerts: u64,
     /// High alerts count.
@@ -165,14 +177,18 @@ pub fn execute_query(query: &ProveQuery) -> io::Result<ProveResponse> {
 
     let rollback_status = compute_rollback_status(&alerts_result);
 
+    // Drain pending agent notifications
+    let agent_notifications = crate::agent_notifications::drain_notifications();
+
     Ok(ProveResponse {
-        version: "0.1.4".to_string(),
+        version: "0.1.5".to_string(),
         generated_at: Utc::now(),
         protection,
         alerts: alerts_result,
         metrics: metrics_data,
         health,
         rollback_status,
+        agent_notifications,
     })
 }
 
@@ -186,6 +202,9 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
     let mut taint_blocks = 0u64;
     let mut proxy_misconfigs = 0u64;
     let mut conversation_blocked = 0u64;
+    let mut auto_rollbacks = 0u64;
+    let mut rollback_recs = 0u64;
+    let mut contamination_events = 0u64;
     let mut critical = 0u64;
     let mut high = 0u64;
     let mut medium = 0u64;
@@ -215,6 +234,9 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
                     conversation_blocked += 1;
                 }
             }
+            ThreatCategory::AutoRollback => auto_rollbacks += 1,
+            ThreatCategory::RollbackRecommended => rollback_recs += 1,
+            ThreatCategory::ContaminationDetected => contamination_events += 1,
             _ => {}
         }
 
@@ -246,6 +268,17 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
         0.0
     };
 
+    // Count skill verifications from records
+    let skills_verified = all_records
+        .iter()
+        .filter(|r| {
+            if r.record_type != RecordType::GuardDecision {
+                return false;
+            }
+            r.meta.config_key.as_deref() == Some("skills.install")
+        })
+        .count() as u64;
+
     Ok(ProtectionSummary {
         total_threats_blocked: total_blocked,
         cpi_violations_blocked: cpi_blocked,
@@ -253,6 +286,10 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
         conversation_threats_blocked: conversation_blocked,
         taint_blocks,
         proxy_misconfigs_detected: proxy_misconfigs,
+        auto_rollbacks,
+        rollback_recommendations: rollback_recs,
+        contamination_events,
+        skills_verified,
         critical_alerts: critical,
         high_alerts: high,
         medium_alerts: medium,
@@ -378,6 +415,10 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     out.push_str(&format!("  Conversation Blocked:    {}\n", p.conversation_threats_blocked));
     out.push_str(&format!("  Taint Blocks:            {}\n", p.taint_blocks));
     out.push_str(&format!("  Proxy Misconfigs:        {}\n", p.proxy_misconfigs_detected));
+    out.push_str(&format!("  Auto-Rollbacks:          {}\n", p.auto_rollbacks));
+    out.push_str(&format!("  Rollback Recs:           {}\n", p.rollback_recommendations));
+    out.push_str(&format!("  Contamination Events:    {}\n", p.contamination_events));
+    out.push_str(&format!("  Skills Verified:         {}\n", p.skills_verified));
     out.push_str(&format!(
         "  Protection Rate:         {:.1}%\n",
         p.protection_rate * 100.0
@@ -464,6 +505,29 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     } else {
         out.push_str("\n── Recent Alerts ──────────────────────────────────────────────\n\n");
         out.push_str("  No alerts in the selected time range.\n");
+    }
+
+    // Agent Notifications
+    if !response.agent_notifications.is_empty() {
+        out.push_str("\n── Agent Notifications ─────────────────────────────────────────\n\n");
+        for n in &response.agent_notifications {
+            let icon = match n.level {
+                crate::agent_notifications::NotificationLevel::Critical => "[!!]",
+                crate::agent_notifications::NotificationLevel::Error => "[! ]",
+                crate::agent_notifications::NotificationLevel::Warning => "[. ]",
+                crate::agent_notifications::NotificationLevel::Info => "[  ]",
+            };
+            out.push_str(&format!(
+                "  {} [{}] {} — {}\n",
+                icon,
+                n.source,
+                n.level,
+                n.message,
+            ));
+            if let Some(action) = &n.suggested_action {
+                out.push_str(&format!("       Action: {}\n", action));
+            }
+        }
     }
 
     out.push_str("\n───────────────────────────────────────────────────────────────\n");

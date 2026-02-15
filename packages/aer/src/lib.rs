@@ -1,4 +1,5 @@
 pub mod alerts;
+pub mod agent_notifications;
 pub mod audit_chain;
 pub mod bundle;
 pub mod canonical;

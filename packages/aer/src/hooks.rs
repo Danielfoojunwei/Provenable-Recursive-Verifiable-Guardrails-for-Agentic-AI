@@ -1,3 +1,4 @@
+use crate::agent_notifications::{self as notif};
 use crate::alerts;
 use crate::audit_chain;
 use crate::canonical::sha256_hex;
@@ -163,8 +164,23 @@ pub fn on_control_plane_change(
     match verdict {
         GuardVerdict::Allow => {
             // RVU §2: Auto-snapshot before CPI change for recoverability
-            let _snapshot_id = rollback_policy::auto_snapshot_before_cpi(config_key)
-                .unwrap_or(None);
+            let snapshot_id = match rollback_policy::auto_snapshot_before_cpi(config_key) {
+                Ok(Some(id)) => {
+                    notif::notify_auto_snapshot(config_key, &id);
+                    Some(id)
+                }
+                Ok(None) => None, // Cooldown active, recent snapshot exists
+                Err(e) => {
+                    notif::notify_auto_snapshot_failed(config_key, &e.to_string());
+                    None
+                }
+            };
+
+            notif::notify_cpi_allowed(
+                config_key,
+                &format!("{:?}", principal),
+                snapshot_id.as_deref(),
+            );
 
             // Emit the actual change record
             let mut meta = RecordMeta::now();
@@ -182,21 +198,36 @@ pub fn on_control_plane_change(
             Ok(Ok(record))
         }
         GuardVerdict::Deny => {
+            let rule_id = decision_record.meta.rule_id.clone().unwrap_or_default();
+
+            // Notify agent of denial
+            notif::notify_cpi_denied(
+                config_key,
+                &format!("{:?}", principal),
+                &rule_id,
+                &decision_record.record_id,
+            );
+
             // Feed denial into rollback policy engine
             let detail = GuardDecisionDetail {
                 verdict: GuardVerdict::Deny,
-                rule_id: decision_record.meta.rule_id.clone().unwrap_or_default(),
-                rationale: String::new(),
+                rule_id: rule_id.clone(),
+                rationale: format!(
+                    "CPI change '{}' denied for {:?} principal (taint: {:?})",
+                    config_key, principal, taint
+                ),
                 surface: GuardSurface::ControlPlane,
                 principal,
                 taint,
             };
-            let _ = rollback_policy::on_guard_denial(
+            if let Ok(policy_result) = rollback_policy::on_guard_denial(
                 GuardSurface::ControlPlane,
                 &detail.rule_id,
                 &decision_record.record_id,
                 &detail,
-            );
+            ) {
+                notif::notify_denial_policy(&policy_result);
+            }
 
             Ok(Err(decision_record))
         }
@@ -242,6 +273,8 @@ pub fn on_file_write(
 
         match verdict {
             GuardVerdict::Allow => {
+                notif::notify_mi_write_allowed(file_path, &format!("{:?}", principal));
+
                 // Emit FileWrite record
                 let mut meta = RecordMeta::now();
                 meta.path = Some(file_path.to_string());
@@ -264,21 +297,35 @@ pub fn on_file_write(
                 Ok(Ok(record))
             }
             GuardVerdict::Deny => {
+                let rule_id = decision_record.meta.rule_id.clone().unwrap_or_default();
+
+                notif::notify_mi_write_denied(
+                    file_path,
+                    &format!("{:?}", principal),
+                    &rule_id,
+                    &decision_record.record_id,
+                );
+
                 // Feed denial into rollback policy engine
                 let detail = GuardDecisionDetail {
                     verdict: GuardVerdict::Deny,
-                    rule_id: decision_record.meta.rule_id.clone().unwrap_or_default(),
-                    rationale: String::new(),
+                    rule_id: rule_id.clone(),
+                    rationale: format!(
+                        "Memory write to '{}' denied for {:?} principal (taint: {:?})",
+                        file_path, principal, taint
+                    ),
                     surface: GuardSurface::DurableMemory,
                     principal,
                     taint,
                 };
-                let _ = rollback_policy::on_guard_denial(
+                if let Ok(policy_result) = rollback_policy::on_guard_denial(
                     GuardSurface::DurableMemory,
                     &detail.rule_id,
                     &decision_record.record_id,
                     &detail,
-                );
+                ) {
+                    notif::notify_denial_policy(&policy_result);
+                }
 
                 Ok(Err(decision_record))
             }
@@ -340,8 +387,10 @@ pub fn check_proxy_trust(
         )?;
         audit_chain::emit_audit(&record.record_id)?;
 
-        // Emit proxy misconfiguration alert
-        let _ = alerts::emit_proxy_alert(trusted_proxies, gateway_addr, &record.record_id);
+        // Emit proxy misconfiguration alert and notify agent
+        if let Ok(_alert) = alerts::emit_proxy_alert(trusted_proxies, gateway_addr, &record.record_id) {
+            notif::notify_proxy_misconfig(trusted_proxies, gateway_addr);
+        }
 
         Ok(Some(record))
     } else {
@@ -418,6 +467,14 @@ pub fn on_skill_install(
     )?;
     audit_chain::emit_audit(&record.record_id)?;
 
+    // Notify agent of skill verification result
+    notif::notify_skill_verdict(
+        &package.name,
+        verdict_str,
+        result.findings.len(),
+        &record.record_id,
+    );
+
     // Emit alert on denial
     if result.verdict == crate::skill_verifier::SkillVerdict::Deny {
         let detail = GuardDecisionDetail {
@@ -435,12 +492,20 @@ pub fn on_skill_install(
             principal,
             taint: record_taint,
         };
-        let _ = alerts::emit_alert(
+        if let Err(e) = alerts::emit_alert(
             alerts::ThreatCategory::CpiViolation,
             &detail,
             &record.record_id,
             &package.name,
-        );
+        ) {
+            notif::notify(
+                notif::NotificationLevel::Warning,
+                notif::NotificationSource::System,
+                format!("Failed to emit skill denial alert: {}", e),
+                Some(&record.record_id),
+                None,
+            );
+        }
     }
 
     match result.verdict {
@@ -503,21 +568,35 @@ pub fn on_message_input(
             Ok(Ok(record))
         }
         GuardVerdict::Deny => {
+            let rule_id = decision_record.meta.rule_id.clone().unwrap_or_default();
+
+            // Notify agent of input block
+            notif::notify_input_blocked(
+                &format!("{:?}", principal),
+                &rule_id,
+                &decision_record.record_id,
+            );
+
             // Feed denial into rollback policy engine
             let detail = GuardDecisionDetail {
                 verdict: GuardVerdict::Deny,
-                rule_id: decision_record.meta.rule_id.clone().unwrap_or_default(),
-                rationale: String::new(),
+                rule_id: rule_id.clone(),
+                rationale: format!(
+                    "Inbound message from {:?} blocked by rule '{}' (taint: {:?})",
+                    principal, rule_id, taint
+                ),
                 surface: GuardSurface::ConversationIO,
                 principal,
                 taint,
             };
-            let _ = rollback_policy::on_guard_denial(
+            if let Ok(policy_result) = rollback_policy::on_guard_denial(
                 GuardSurface::ConversationIO,
                 &detail.rule_id,
                 &decision_record.record_id,
                 &detail,
-            );
+            ) {
+                notif::notify_denial_policy(&policy_result);
+            }
 
             Ok(Err(decision_record))
         }
@@ -538,7 +617,7 @@ pub fn on_message_output(
     parent_records: Vec<String>,
 ) -> io::Result<Result<TypedRecord, TypedRecord>> {
     let g = guard::Guard::load_default()?;
-    let (safe, _scan_result, decision_record) = g.check_conversation_output(
+    let (safe, scan_result, decision_record) = g.check_conversation_output(
         content,
         session_id,
         output_guard_config,
@@ -568,26 +647,59 @@ pub fn on_message_output(
         audit_chain::emit_audit(&record.record_id)?;
         Ok(Ok(record))
     } else {
+        // Notify agent of output leakage block
+        let leaked_count = scan_result.leaked_tokens.len();
+        let structural_count = scan_result.structural_leaks.len();
+        notif::notify_output_blocked(leaked_count, structural_count, &decision_record.record_id);
+
         // RVU: Compute contamination scope for leakage source
         if let Ok(scope) = rollback_policy::compute_contamination_scope(&decision_record.record_id) {
-            let _ = rollback_policy::emit_contamination_alert(&decision_record.record_id, &scope);
+            if scope.contaminated_count > 0 {
+                notif::notify(
+                    notif::NotificationLevel::Critical,
+                    notif::NotificationSource::RollbackPolicy,
+                    format!(
+                        "CONTAMINATION: {} downstream records affected by leakage source {}. Types: {}",
+                        scope.contaminated_count,
+                        &decision_record.record_id[..decision_record.record_id.len().min(12)],
+                        scope.affected_types.join(", "),
+                    ),
+                    Some(&decision_record.record_id),
+                    Some("Review contaminated records and consider rollback."),
+                );
+            }
+            if let Err(e) = rollback_policy::emit_contamination_alert(&decision_record.record_id, &scope) {
+                notif::notify(
+                    notif::NotificationLevel::Warning,
+                    notif::NotificationSource::System,
+                    format!("Failed to emit contamination alert: {}", e),
+                    Some(&decision_record.record_id),
+                    None,
+                );
+            }
         }
 
         // Feed denial into rollback policy engine
+        let rule_id = decision_record.meta.rule_id.clone().unwrap_or_default();
         let detail = GuardDecisionDetail {
             verdict: GuardVerdict::Deny,
-            rule_id: decision_record.meta.rule_id.clone().unwrap_or_default(),
-            rationale: String::new(),
+            rule_id: rule_id.clone(),
+            rationale: format!(
+                "Output blocked: {} leaked tokens, {} structural patterns detected",
+                leaked_count, structural_count
+            ),
             surface: GuardSurface::ConversationIO,
             principal: Principal::Sys,
             taint: TaintFlags::SECRET_RISK,
         };
-        let _ = rollback_policy::on_guard_denial(
+        if let Ok(policy_result) = rollback_policy::on_guard_denial(
             GuardSurface::ConversationIO,
             &detail.rule_id,
             &decision_record.record_id,
             &detail,
-        );
+        ) {
+            notif::notify_denial_policy(&policy_result);
+        }
 
         Ok(Err(decision_record))
     }
