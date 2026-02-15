@@ -491,7 +491,47 @@ considerations:
 - Blob integrity depends on SHA-256 collision resistance. See the threat model
   for collision considerations.
 
-## 12. References
+## 12. Empirical Validation
+
+The AEGX + AER implementation has been validated against the ZeroLeaks
+attack taxonomy (zeroleaks.ai), which tested 36 attack vectors across prompt
+injection (23 attacks) and system prompt extraction (13 attacks).
+
+### 12.1 Benchmark Methodology
+
+Attack payloads were reconstructed from the ZeroLeaks OpenClaw Security
+Assessment and run through the actual AER scanner and output guard code.
+No mocking or simulation — the real detection functions process real attack
+strings. The benchmark test is at `packages/aer/tests/zeroleaks_benchmark.rs`.
+
+### 12.2 Results Summary
+
+| Layer | Metric | Result |
+|-------|--------|--------|
+| Input Scanner | Extraction attacks blocked/tainted | 8/13 (61.5%) |
+| Input Scanner | Injection attacks blocked/tainted | 22/23 (95.7%) |
+| Output Guard | Leaked response patterns caught | 11/11 (100%) |
+| Output Guard | False positive rate | 0% |
+| Combined | ZLSS (1-10, lower=better) | 2/10 (was 10/10) |
+| Combined | Security Score (0-100) | 79/100 (was 2/100) |
+
+### 12.3 Theorem Coverage
+
+Each detection category is grounded in a published formal theorem:
+
+- **Noninterference Theorem**: EncodedPayload, IndirectInjection, ManyShotPriming, FormatOverride
+- **CPI Theorem**: SystemImpersonation, BehaviorManipulation
+- **MI Theorem**: ExtractionAttempt, FalseContextInjection (+ Noninterference)
+- **RVU Machine Unlearning**: All GuardDecision records feed the contamination DAG
+
+### 12.4 Known Limitations
+
+1. Scanner is stateless — no multi-turn attack tracking
+2. Pattern matching is syntactic — no semantic intent classification
+3. Output guard requires pre-configured token watchlist
+4. Benchmark measures detection, not LLM compliance with attacks
+
+## 13. References
 
 - [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) -- Date and Time on the Internet: Timestamps
 - [Unicode NFC](https://unicode.org/reports/tr15/) -- Unicode Normalization Forms

@@ -82,6 +82,66 @@ All workspace memory writes MUST pass through `workspace::write_memory_file()`. 
 3. If **allowed**: writes the file to disk and emits a `FileWrite` record
 4. If **denied**: does NOT write and returns the denial record ID
 
+## ConversationIO Guard (CIO) — Prompt Injection / Extraction Defense
+
+The ConversationIO surface protects the conversation boundary between users
+(or untrusted channels) and the LLM. It integrates all four published theorems.
+
+### Threat: ZeroLeaks Attack Taxonomy
+
+The ZeroLeaks OpenClaw Security Assessment demonstrated 91.3% injection success
+and 84.6% extraction success against unprotected systems. The CIO guard
+addresses this with two enforcement layers.
+
+### Layer 1: Input Scanner (8 Detection Categories)
+
+| Category | Taint Flags | Confidence | Theorem Basis |
+|----------|-------------|------------|---------------|
+| `SystemImpersonation` | `INJECTION_SUSPECT` + `UNTRUSTED` | 0.85-0.90 | CPI (A2: Principal Accuracy) |
+| `IndirectInjection` | `INJECTION_SUSPECT` + `UNTRUSTED` | 0.85 | Noninterference |
+| `BehaviorManipulation` | `INJECTION_SUSPECT` + `UNTRUSTED` | 0.85 | CPI (behavioral state) |
+| `FalseContextInjection` | `INJECTION_SUSPECT` + `UNTRUSTED` | 0.80 | MI + Noninterference (A1) |
+| `EncodedPayload` | `INJECTION_SUSPECT` + `UNTRUSTED` | 0.70-0.85 | Noninterference |
+| `ExtractionAttempt` | `UNTRUSTED` | 0.75-0.95 | MI (read-side) |
+| `ManyShotPriming` | `UNTRUSTED` | 0.70-0.90 | Noninterference |
+| `FormatOverride` | `UNTRUSTED` | 0.80 | Noninterference |
+
+Scanner verdict thresholds:
+- **Block**: SystemImpersonation or ExtractionAttempt at confidence ≥ 0.9, OR ≥ 3 findings at confidence ≥ 0.75
+- **Suspicious**: Any finding at confidence ≥ 0.7
+- **Clean**: No findings above threshold
+
+### Layer 2: Output Guard (Leaked-Content Detection)
+
+Scans outbound LLM responses for leaked system prompt content:
+- **Exact-match watchlist**: Internal tokens (SILENT_REPLY_TOKEN, buildSkillsSection, ${params.*})
+- **Pattern watchlist**: Structural prompt patterns (skill loading, memory search, reply tags)
+- **Section heuristic**: Detects multi-section prompt dumps (4+ section headers)
+
+### Default Policy Rules
+
+| Rule ID | Action | Condition | Description |
+|---------|--------|-----------|-------------|
+| `cio-deny-injection` | DENY | taint intersects {INJECTION_SUSPECT} | Block injection-suspect messages from ALL principals |
+| `cio-deny-untrusted-tainted` | DENY | principal in {Web, Skill, Channel, External} AND taint intersects {UNTRUSTED} | Block tainted messages from untrusted principals |
+| `cio-allow-clean` | ALLOW | (fallback) | Allow clean or USER messages without injection taint |
+
+### Enforcement Points
+
+**Input**: `guard.check_conversation_input()` — scans before LLM processes the message
+**Output**: `guard.check_conversation_output()` — scans LLM response before delivery
+
+### Empirical Results (ZeroLeaks Benchmark)
+
+```
+Extraction: 3/13 blocked at input, 5/13 suspicious (tainted), 5/13 clean
+Injection:  13/23 blocked at input, 9/23 suspicious (tainted), 1/23 clean
+Output:     11/11 leaked patterns caught, 0 false positives
+
+ZLSS:           10/10  →  2/10
+Security Score:  2/100 →  79/100
+```
+
 ## Reverse Proxy Trust Detection
 
 ### Surface

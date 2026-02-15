@@ -129,6 +129,111 @@ AER implements the structural guarantees from four published formal theorems:
 - [Memory Integrity Theorem](https://github.com/Danielfoojunwei/Memory-integrity-theorem) — Guarantees immutability, taint blocking, and session isolation for persistent memory.
 - [RVU Machine Unlearning](https://github.com/Danielfoojunwei/RVU-Machine-Unlearning) — Provenance DAG with contamination detection, closure computation, and verifiable recovery certificates.
 
+### Theorem → Defense Integration Map
+
+Every scanner detection category and guard surface is grounded in a specific
+theorem. The table below shows the exact mapping:
+
+| Scanner Category       | Primary Theorem       | What It Prevents                                    |
+|------------------------|-----------------------|-----------------------------------------------------|
+| `SystemImpersonation`  | CPI Theorem (A2)      | Fake `[SYSTEM]`/`[ADMIN]` tags override transport-assigned principal |
+| `IndirectInjection`    | Noninterference       | Hidden AI directives in documents cross trust boundaries |
+| `BehaviorManipulation` | CPI Theorem           | Persona/instruction overrides mutate control-plane behavioral state |
+| `FalseContextInjection`| MI + Noninterference  | Fabricated prior context poisons working memory (violates A1) |
+| `EncodedPayload`       | Noninterference       | Encoded payloads evade taint detection, bypassing isolation |
+| `ExtractionAttempt`    | MI (read-side)        | System prompt is protected memory; disclosure violates confidentiality |
+| `ManyShotPriming`      | Noninterference       | Accumulated untrusted examples override model behavior |
+| `FormatOverride`       | Noninterference       | Format locks enable exfiltration or bypass downstream defenses |
+
+| Guard Surface      | Theorem(s)            | Enforcement Point                     |
+|--------------------|-----------------------|---------------------------------------|
+| `ControlPlane`     | CPI Theorem           | `guard.check_control_plane()` — skill/tool/permission mutations |
+| `DurableMemory`    | MI Theorem            | `guard.check_memory_write()` — SOUL.md, AGENTS.md, etc. |
+| `ConversationIO`   | All four theorems     | `guard.check_conversation_input()` + `check_conversation_output()` |
+
+| Output Guard Layer  | Theorem               | What It Catches                       |
+|---------------------|-----------------------|---------------------------------------|
+| Token watchlist     | MI (read-side)        | Internal tokens (SILENT_REPLY_TOKEN, HEARTBEAT_OK, etc.) |
+| Structural patterns | MI + CPI              | Prompt structure disclosure (skill loading, reply tags, identity) |
+| Section heuristic   | MI                    | Multi-section prompt dumps (4+ section headers) |
+
+---
+
+## Empirical Validation: ZeroLeaks Benchmark
+
+The ZeroLeaks OpenClaw Security Assessment (zeroleaks.ai) found that the
+unprotected system achieved a **ZLSS of 10/10** (worst possible) and a
+**Security Score of 2/100**, with 84.6% extraction success and 91.3%
+injection success across 36 attack vectors.
+
+We ran the exact same attack taxonomy against our ConversationIO guard
+using real attack payloads through the real scanner and output guard code
+(**no mocks, no simulations** — see `packages/aer/tests/zeroleaks_benchmark.rs`).
+
+### Results (Worst-Case: USER Principal, Input Scanner Only)
+
+| Metric                     | Before (No Guards) | After (ConversationIO Guard) |
+|----------------------------|--------------------|------------------------------|
+| Extraction Success Rate    | 84.6% (11/13)      | 38.5% (5/13)                 |
+| Injection Success Rate     | 91.3% (21/23)      | 4.3% (1/23)                  |
+| **ZLSS (1-10, lower=better)** | **10/10**       | **2/10**                     |
+| **Security Score (0-100)** | **2/100**           | **79/100**                   |
+
+### Layer-by-Layer Breakdown
+
+**Layer 1 — Input Scanner:**
+
+| Attack Type | Blocked | Suspicious (Tainted) | Clean (Passed) |
+|-------------|---------|---------------------|----------------|
+| Extraction (13 attacks) | 3 | 5 | 5 |
+| Injection (23 attacks) | 13 | 9 | 1 |
+
+**Layer 2 — Output Guard:**
+
+| Metric | Result |
+|--------|--------|
+| Leaked response patterns caught | 11/11 (100%) |
+| False positives on clean responses | 0 |
+
+**Layer 3 — Policy Enforcement:**
+
+Suspicious verdicts carry taint flags that trigger policy denial:
+
+| Taint Flag | Policy Rule | Effect |
+|------------|-------------|--------|
+| `INJECTION_SUSPECT` | `cio-deny-injection` | Denied for **all** principals (including USER) |
+| `UNTRUSTED` | `cio-deny-untrusted-tainted` | Denied for WEB, SKILL, CHANNEL, EXTERNAL |
+
+With policy enforcement for untrusted principals (the actual threat model for
+Discord bots, web interfaces, and API integrations):
+- **Injection success drops to 4.3%** (1/23 — only a bare canary word passes)
+- **Extraction**: all tainted messages blocked; output guard catches the rest
+
+### Honest Gaps
+
+These are the known limitations of the current implementation:
+
+1. **Stateless scanner** — No cross-message state tracking. Crescendo/multi-turn
+   attacks that build gradually across messages are not detected by the scanner,
+   though the output guard catches leaked content.
+2. **FormatOverride is soft** — Only sets `UNTRUSTED` taint, not `INJECTION_SUSPECT`.
+   Allowed for USER principal by design (users legitimately request format changes).
+3. **Output guard uses known tokens** — Only catches tokens from the ZeroLeaks
+   report. Novel system prompts with different internal tokens need a custom
+   `OutputGuardConfig`.
+4. **Syntactic, not semantic** — Pattern matching detects known attack phrasings.
+   Novel phrasings that express the same intent may bypass detection.
+5. **No LLM in the loop** — Benchmark measures scanner/guard detection rates, not
+   whether the LLM would comply with the attack. Actual success rates depend on
+   model behavior.
+
+### How to Run the Benchmark
+
+```bash
+cd packages/aer
+cargo test zeroleaks_full_benchmark -- --nocapture
+```
+
 ---
 
 ## Security Hardening Status

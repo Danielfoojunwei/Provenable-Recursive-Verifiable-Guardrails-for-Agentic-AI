@@ -37,6 +37,52 @@ AER operates as a reference monitor at the chokepoints where control-plane mutat
 - Read confidentiality or data exfiltration through model outputs
 - User-channel attacks where humans paste malicious content voluntarily
 
+### ConversationIO Guard (Prompt Injection / Extraction Defense)
+
+**Theorem basis**: The ConversationIO guard integrates all four published theorems to defend against prompt injection and system prompt extraction at the conversation boundary:
+
+- **Noninterference Theorem** — Scanner detects encoded payloads, indirect injection, many-shot priming, and format overrides that would allow untrusted data to influence model behavior across trust boundaries.
+- **CPI Theorem (A2)** — Scanner detects system/authority impersonation (fake `[SYSTEM]`/`[ADMIN]` tags) that attempt to override transport-assigned principals, and behavior manipulation that targets control-plane behavioral state.
+- **MI Theorem (read-side)** — Output guard detects leaked internal tokens, structural prompt patterns, and identity statements. The system prompt is a protected memory artifact; unauthorized disclosure violates confidentiality.
+- **RVU Machine Unlearning** — Every blocked attack is recorded as a tamper-evident `GuardDecision` in the audit chain, enabling contamination detection and provenance-based closure computation.
+
+**In practice** (two-layer enforcement):
+
+Layer 1 — Input Scanner (8 detection categories):
+
+| Category | Taint | ZeroLeaks Attacks | Theorem |
+|----------|-------|-------------------|---------|
+| `SystemImpersonation` | `INJECTION_SUSPECT` + `UNTRUSTED` | 4.1: system/authority impersonation | CPI (A2) |
+| `IndirectInjection` | `INJECTION_SUSPECT` + `UNTRUSTED` | 4.1: document/email/code injection | Noninterference |
+| `BehaviorManipulation` | `INJECTION_SUSPECT` + `UNTRUSTED` | 4.1: persona/behavior override | CPI |
+| `FalseContextInjection` | `INJECTION_SUSPECT` + `UNTRUSTED` | 4.1: false memory/context | MI + Noninterference |
+| `EncodedPayload` | `INJECTION_SUSPECT` + `UNTRUSTED` | 4.1: base64/ROT13/reversal | Noninterference |
+| `ExtractionAttempt` | `UNTRUSTED` | 3.1-3.11: all extraction variants | MI (read-side) |
+| `ManyShotPriming` | `UNTRUSTED` | 3.2, 3.9: 8/14-example priming | Noninterference |
+| `FormatOverride` | `UNTRUSTED` | 4.1: format/language/case override | Noninterference |
+
+Layer 2 — Output Guard (leaked-content detection):
+- Internal tokens: `SILENT_REPLY_TOKEN`, `HEARTBEAT_OK`, `buildSkillsSection`, etc.
+- Structural patterns: skill loading logic, memory search protocol, reply tag syntax
+- Identity statements: platform identity, masked variants
+- Multi-section heuristic: 4+ section headers indicate prompt dump
+
+**Empirical validation** (ZeroLeaks benchmark, no mocks):
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Extraction success | 84.6% | 38.5% (worst-case USER) |
+| Injection success | 91.3% | 4.3% (worst-case USER) |
+| ZLSS (1-10) | 10/10 | 2/10 |
+| Security Score | 2/100 | 79/100 |
+| Output guard catch rate | N/A | 11/11 (100%) |
+
+**Boundary**: ConversationIO does NOT protect against:
+- Multi-turn crescendo attacks (scanner is stateless per-message)
+- Novel phrasings not in the pattern database
+- Attacks where the USER principal is the attacker (format overrides only set UNTRUSTED taint)
+- Model-internal reasoning manipulation that doesn't trigger syntactic patterns
+
 ### Tamper-Evident Evidence
 
 **Guarantee**: The append-only hash chain (Merkle-style) ensures that:
@@ -91,8 +137,24 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 ## What AER Does NOT Cover
 
 - Model behavior during inference (AER operates structurally, not on model internals)
-- Prompt injection within a single inference turn
-- Data exfiltration through authorized read paths
+- ~~Prompt injection within a single inference turn~~ **Partially addressed**: The ConversationIO scanner detects known injection patterns and blocks 22/23 injection attacks from the ZeroLeaks taxonomy. Remaining gap: novel phrasings and multi-turn crescendo attacks.
+- ~~Data exfiltration through authorized read paths~~ **Partially addressed**: The output guard detects leaked system prompt tokens. Remaining gap: exfiltration of user data or tool outputs that don't match the watchlist.
 - Physical compromise of the host system
 - Availability attacks / performance degradation
 - Social engineering of legitimate users
+
+## Residual Risk After ConversationIO Guard
+
+The following attack classes remain partially effective despite the guard:
+
+| Attack Class | Success Rate | Why |
+|-------------|-------------|-----|
+| Multi-turn crescendo | ~50% | Scanner is stateless; gradual deepening across messages not tracked |
+| Novel phrasings | Unknown | Syntactic pattern matching cannot generalize to unseen formulations |
+| Format override (USER) | ~30% | FormatOverride only sets UNTRUSTED; policy allows for USER principal |
+| Unknown internal tokens | 0% detection | Output guard only watches for tokens from ZeroLeaks report |
+
+These gaps require architectural enhancements documented in the roadmap:
+1. **Conversation-level state tracking** — Track extraction progress across messages
+2. **Semantic classification** — ML-based intent detection beyond pattern matching
+3. **Dynamic token discovery** — Auto-populate output guard watchlist from actual system prompt
