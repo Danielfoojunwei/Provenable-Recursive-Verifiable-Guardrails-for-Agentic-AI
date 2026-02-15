@@ -255,11 +255,14 @@ pub fn on_file_write(
 
 /// Hook: detect proxy trust misconfiguration.
 /// Emits an audit warning record (does not block).
-pub fn check_proxy_trust(trusted_proxies: &[String], gateway_addr: &str) -> io::Result<Option<TypedRecord>> {
+pub fn check_proxy_trust(
+    trusted_proxies: &[String],
+    gateway_addr: &str,
+) -> io::Result<Option<TypedRecord>> {
     // Detect common misconfigurations
-    let is_misconfig = trusted_proxies.iter().any(|p| {
-        p == "0.0.0.0/0" || p == "*" || p == "::/0"
-    });
+    let is_misconfig = trusted_proxies
+        .iter()
+        .any(|p| p == "0.0.0.0/0" || p == "*" || p == "::/0");
 
     if is_misconfig {
         let mut meta = RecordMeta::now();

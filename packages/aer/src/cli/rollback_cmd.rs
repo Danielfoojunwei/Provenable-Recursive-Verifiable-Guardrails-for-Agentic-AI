@@ -6,7 +6,11 @@ pub fn run(snapshot_id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let manifest = snapshot::load_snapshot(snapshot_id)?;
     let (modified, _added, removed) = snapshot::diff_snapshot(&manifest)?;
 
-    println!("Rolling back to snapshot: {} ({})", &snapshot_id[..8], manifest.name);
+    println!(
+        "Rolling back to snapshot: {} ({})",
+        &snapshot_id[..8],
+        manifest.name
+    );
     println!("  Files to restore: {}", modified.len());
     println!("  Files to recreate: {}", removed.len());
 

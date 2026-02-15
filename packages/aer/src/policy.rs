@@ -16,9 +16,7 @@ pub fn load_policy(path: &Path) -> io::Result<PolicyPack> {
     // Check sidecar integrity file if it exists
     let checksum_path = path.with_extension("yaml.sha256");
     if checksum_path.exists() {
-        let expected_hash = fs::read_to_string(&checksum_path)?
-            .trim()
-            .to_lowercase();
+        let expected_hash = fs::read_to_string(&checksum_path)?.trim().to_lowercase();
         let actual_hash = sha256_hex(content.as_bytes());
         if expected_hash != actual_hash {
             return Err(io::Error::new(
@@ -52,8 +50,12 @@ pub fn load_policy(path: &Path) -> io::Result<PolicyPack> {
         }
     }
 
-    let pack: PolicyPack = serde_yaml::from_str(&content)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Policy parse error: {e}")))?;
+    let pack: PolicyPack = serde_yaml::from_str(&content).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Policy parse error: {e}"),
+        )
+    })?;
 
     // Structural validation: ensure no rule allows untrusted principals
     // to modify the control plane (defense-in-depth against injected policies)
@@ -138,7 +140,12 @@ pub fn default_policy() -> PolicyPack {
                 action: GuardVerdict::Deny,
                 condition: PolicyCondition {
                     principals: None,
-                    taint_any: Some(TaintFlags::UNTRUSTED | TaintFlags::INJECTION_SUSPECT | TaintFlags::WEB_DERIVED | TaintFlags::SKILL_OUTPUT),
+                    taint_any: Some(
+                        TaintFlags::UNTRUSTED
+                            | TaintFlags::INJECTION_SUSPECT
+                            | TaintFlags::WEB_DERIVED
+                            | TaintFlags::SKILL_OUTPUT,
+                    ),
                     require_approval: None,
                 },
                 description: "Deny memory writes with tainted provenance".to_string(),
@@ -158,7 +165,9 @@ pub fn default_policy() -> PolicyPack {
                     taint_any: None,
                     require_approval: None,
                 },
-                description: "Deny memory writes from untrusted principals without explicit approval".to_string(),
+                description:
+                    "Deny memory writes from untrusted principals without explicit approval"
+                        .to_string(),
             },
             // MI: allow USER/SYS memory writes
             PolicyRule {
@@ -183,7 +192,7 @@ pub fn save_policy(pack: &PolicyPack, path: &Path) -> io::Result<()> {
         fs::create_dir_all(parent)?;
     }
     let content = serde_yaml::to_string(pack)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Policy serialize error: {e}")))?;
+        .map_err(|e| io::Error::other(format!("Policy serialize error: {e}")))?;
     fs::write(path, &content)?;
 
     // Write sidecar checksum file
@@ -253,8 +262,13 @@ mod tests {
     #[test]
     fn test_default_policy_denies_web_cpi() {
         let policy = default_policy();
-        let (verdict, rule_id, _) =
-            evaluate(&policy, GuardSurface::ControlPlane, Principal::Web, TaintFlags::empty(), false);
+        let (verdict, rule_id, _) = evaluate(
+            &policy,
+            GuardSurface::ControlPlane,
+            Principal::Web,
+            TaintFlags::empty(),
+            false,
+        );
         assert_eq!(verdict, GuardVerdict::Deny);
         assert_eq!(rule_id, "cpi-deny-untrusted");
     }
@@ -262,8 +276,13 @@ mod tests {
     #[test]
     fn test_default_policy_allows_user_cpi() {
         let policy = default_policy();
-        let (verdict, rule_id, _) =
-            evaluate(&policy, GuardSurface::ControlPlane, Principal::User, TaintFlags::empty(), false);
+        let (verdict, rule_id, _) = evaluate(
+            &policy,
+            GuardSurface::ControlPlane,
+            Principal::User,
+            TaintFlags::empty(),
+            false,
+        );
         assert_eq!(verdict, GuardVerdict::Allow);
         assert_eq!(rule_id, "cpi-allow-authorized");
     }
@@ -315,7 +334,10 @@ mod tests {
         };
 
         let result = validate_policy_safety(&malicious_policy);
-        assert!(result.is_err(), "Should reject policy allowing WEB to modify control plane");
+        assert!(
+            result.is_err(),
+            "Should reject policy allowing WEB to modify control plane"
+        );
         let err = result.unwrap_err().to_string();
         assert!(err.contains("untrusted principal"), "Error: {}", err);
     }
@@ -324,7 +346,11 @@ mod tests {
     fn test_validate_policy_safety_accepts_default() {
         let policy = default_policy();
         let result = validate_policy_safety(&policy);
-        assert!(result.is_ok(), "Default policy should pass safety validation: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Default policy should pass safety validation: {:?}",
+            result.err()
+        );
     }
 
     #[test]

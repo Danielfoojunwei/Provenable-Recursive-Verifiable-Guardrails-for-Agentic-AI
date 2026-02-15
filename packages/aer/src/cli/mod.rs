@@ -1,9 +1,9 @@
-pub mod init;
-pub mod snapshot_cmd;
-pub mod rollback_cmd;
 pub mod bundle_cmd;
-pub mod verify_cmd;
+pub mod init;
 pub mod report_cmd;
+pub mod rollback_cmd;
+pub mod snapshot_cmd;
+pub mod verify_cmd;
 
 use clap::{Parser, Subcommand};
 
@@ -109,7 +109,10 @@ fn status() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("AER: initialized");
-    println!("State directory: {}", crate::config::resolve_state_dir().display());
+    println!(
+        "State directory: {}",
+        crate::config::resolve_state_dir().display()
+    );
     println!("AER root: {}", aer_root.display());
 
     let record_count = crate::records::record_count()?;

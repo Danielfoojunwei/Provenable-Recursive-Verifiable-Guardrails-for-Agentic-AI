@@ -71,7 +71,10 @@ fn test_cpi_deny_untrusted_principal() {
 
     // Verify audit chain has the entry
     let entries = audit_chain::read_all_entries().expect("read audit");
-    assert!(!entries.is_empty(), "Audit chain must have at least one entry");
+    assert!(
+        !entries.is_empty(),
+        "Audit chain must have at least one entry"
+    );
     assert_eq!(entries[0].record_id, denial_record.record_id);
 
     // No ControlPlaneChangeRequest should exist (change was blocked)
@@ -115,7 +118,10 @@ fn test_mi_deny_tainted_memory_write() {
 
     // Verify file was NOT modified
     let content = fs::read_to_string(&soul_path).expect("read soul");
-    assert_eq!(content, "Original soul content", "File must not be modified after denial");
+    assert_eq!(
+        content, "Original soul content",
+        "File must not be modified after denial"
+    );
 
     // Verify GuardDecision was recorded
     let all_records = records::read_all_records().expect("read records");
@@ -123,7 +129,10 @@ fn test_mi_deny_tainted_memory_write() {
         .iter()
         .filter(|r| r.record_type == RecordType::GuardDecision)
         .collect();
-    assert!(!guard_decisions.is_empty(), "GuardDecision must be recorded");
+    assert!(
+        !guard_decisions.is_empty(),
+        "GuardDecision must be recorded"
+    );
 }
 
 // ============================================================
@@ -150,7 +159,10 @@ fn test_cpi_allow_user_change() {
     assert!(result.is_ok(), "CPI change from USER must be allowed");
 
     let change_record = result.unwrap();
-    assert_eq!(change_record.record_type, RecordType::ControlPlaneChangeRequest);
+    assert_eq!(
+        change_record.record_type,
+        RecordType::ControlPlaneChangeRequest
+    );
     assert_eq!(change_record.principal, Principal::User);
 
     // Verify both GuardDecision (allow) and ControlPlaneChangeRequest are recorded
@@ -163,8 +175,14 @@ fn test_cpi_allow_user_change() {
         .iter()
         .filter(|r| r.record_type == RecordType::ControlPlaneChangeRequest)
         .collect();
-    assert!(!guard_decisions.is_empty(), "GuardDecision must be recorded");
-    assert!(!cp_changes.is_empty(), "ControlPlaneChangeRequest must be recorded");
+    assert!(
+        !guard_decisions.is_empty(),
+        "GuardDecision must be recorded"
+    );
+    assert!(
+        !cp_changes.is_empty(),
+        "ControlPlaneChangeRequest must be recorded"
+    );
 
     // Verify audit chain integrity
     let chain_result = audit_chain::verify_chain().expect("verify chain");
@@ -215,9 +233,16 @@ fn test_snapshot_mutate_rollback() {
 
     // Verify files restored to exact hashes
     let restored_soul_hash = sha256_file(&workspace.join("SOUL.md")).expect("hash restored soul");
-    let restored_agents_hash = sha256_file(&workspace.join("AGENTS.md")).expect("hash restored agents");
-    assert_eq!(restored_soul_hash, original_soul_hash, "SOUL.md must match snapshot hash");
-    assert_eq!(restored_agents_hash, original_agents_hash, "AGENTS.md must match snapshot hash");
+    let restored_agents_hash =
+        sha256_file(&workspace.join("AGENTS.md")).expect("hash restored agents");
+    assert_eq!(
+        restored_soul_hash, original_soul_hash,
+        "SOUL.md must match snapshot hash"
+    );
+    assert_eq!(
+        restored_agents_hash, original_agents_hash,
+        "AGENTS.md must match snapshot hash"
+    );
 
     // Verify rollback was recorded
     let all_records = records::read_all_records().expect("read records");
@@ -225,7 +250,10 @@ fn test_snapshot_mutate_rollback() {
         .iter()
         .filter(|r| r.record_type == RecordType::Rollback)
         .collect();
-    assert!(!rollback_records.is_empty(), "Rollback record must be emitted");
+    assert!(
+        !rollback_records.is_empty(),
+        "Rollback record must be emitted"
+    );
 
     // Verify post-rollback file hashes match snapshot
     let verified = rollback::verify_rollback(&snapshot_id).expect("verify rollback");
@@ -241,8 +269,7 @@ fn test_audit_chain_tamper_detection() {
     let _tmp = setup_temp_env();
 
     // Generate some records to populate the audit chain
-    hooks::on_session_start("agent-1", "session-1", "CLI", None)
-        .expect("session start");
+    hooks::on_session_start("agent-1", "session-1", "CLI", None).expect("session start");
 
     hooks::on_tool_call(
         "agent-1",
@@ -323,14 +350,20 @@ fn test_bundle_export_verify_roundtrip() {
     );
 
     // Verify bundle
-    let tmp_extract = bundle::extract_bundle(std::path::Path::new(&bundle_path))
-        .expect("extract bundle");
+    let tmp_extract =
+        bundle::extract_bundle(std::path::Path::new(&bundle_path)).expect("extract bundle");
     let result = verify::verify_bundle(tmp_extract.path()).expect("verify bundle");
 
     assert!(result.valid, "Bundle must verify as valid");
     assert!(result.record_count >= 2, "Should have at least 2 records");
-    assert!(result.audit_entries_checked >= 2, "Should have at least 2 audit entries");
-    assert!(result.errors.is_empty(), "Should have no verification errors");
+    assert!(
+        result.audit_entries_checked >= 2,
+        "Should have at least 2 audit entries"
+    );
+    assert!(
+        result.errors.is_empty(),
+        "Should have no verification errors"
+    );
 }
 
 // ============================================================
@@ -368,25 +401,25 @@ fn test_proxy_trust_misconfig_detection() {
     let _tmp = setup_temp_env();
 
     // Simulate an overly permissive trustedProxies config
-    let result = hooks::check_proxy_trust(
-        &["0.0.0.0/0".to_string()],
-        "127.0.0.1:18789",
-    )
-    .expect("check proxy trust");
+    let result = hooks::check_proxy_trust(&["0.0.0.0/0".to_string()], "127.0.0.1:18789")
+        .expect("check proxy trust");
 
-    assert!(result.is_some(), "Should emit a warning for overly permissive proxies");
+    assert!(
+        result.is_some(),
+        "Should emit a warning for overly permissive proxies"
+    );
 
     let warning_record = result.unwrap();
     assert_eq!(warning_record.record_type, RecordType::GuardDecision);
     assert!(warning_record.taint.contains(TaintFlags::PROXY_DERIVED));
 
     // Safe config should produce no warning
-    let result = hooks::check_proxy_trust(
-        &["10.0.0.1".to_string()],
-        "127.0.0.1:18789",
-    )
-    .expect("check proxy trust safe");
-    assert!(result.is_none(), "Should not emit warning for specific proxy IPs");
+    let result = hooks::check_proxy_trust(&["10.0.0.1".to_string()], "127.0.0.1:18789")
+        .expect("check proxy trust safe");
+    assert!(
+        result.is_none(),
+        "Should not emit warning for specific proxy IPs"
+    );
 }
 
 // ============================================================
@@ -414,7 +447,10 @@ fn test_verify_live_state() {
     let result = verify::verify_live().expect("verify live");
     assert!(result.valid, "Live state must verify as valid");
     assert!(result.record_count > 0, "Should have records");
-    assert!(result.audit_entries_checked > 0, "Should have audit entries");
+    assert!(
+        result.audit_entries_checked > 0,
+        "Should have audit entries"
+    );
 }
 
 // ============================================================

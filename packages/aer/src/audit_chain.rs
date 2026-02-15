@@ -122,9 +122,20 @@ pub fn verify_entries(entries: &[AuditEntry]) -> Result<u64, ChainError> {
 /// Chain verification errors.
 #[derive(Debug, Clone)]
 pub enum ChainError {
-    IndexGap { expected: u64, found: u64 },
-    PrevHashMismatch { idx: u64, expected: String, found: String },
-    EntryHashMismatch { idx: u64, expected: String, found: String },
+    IndexGap {
+        expected: u64,
+        found: u64,
+    },
+    PrevHashMismatch {
+        idx: u64,
+        expected: String,
+        found: String,
+    },
+    EntryHashMismatch {
+        idx: u64,
+        expected: String,
+        found: String,
+    },
 }
 
 impl std::fmt::Display for ChainError {
@@ -133,11 +144,25 @@ impl std::fmt::Display for ChainError {
             ChainError::IndexGap { expected, found } => {
                 write!(f, "Index gap: expected {expected}, found {found}")
             }
-            ChainError::PrevHashMismatch { idx, expected, found } => {
-                write!(f, "prev_hash mismatch at idx {idx}: expected {expected}, found {found}")
+            ChainError::PrevHashMismatch {
+                idx,
+                expected,
+                found,
+            } => {
+                write!(
+                    f,
+                    "prev_hash mismatch at idx {idx}: expected {expected}, found {found}"
+                )
             }
-            ChainError::EntryHashMismatch { idx, expected, found } => {
-                write!(f, "entry_hash mismatch at idx {idx}: expected {expected}, found {found}")
+            ChainError::EntryHashMismatch {
+                idx,
+                expected,
+                found,
+            } => {
+                write!(
+                    f,
+                    "entry_hash mismatch at idx {idx}: expected {expected}, found {found}"
+                )
             }
         }
     }

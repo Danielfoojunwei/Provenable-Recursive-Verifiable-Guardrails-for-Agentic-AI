@@ -6,7 +6,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create directory structure
     config::ensure_aer_dirs()?;
-    println!("  Created AER directories under {}", config::aer_root().display());
+    println!(
+        "  Created AER directories under {}",
+        config::aer_root().display()
+    );
 
     // Install default policy
     let default = policy::default_policy();
@@ -16,7 +19,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // Ensure workspace exists
     crate::workspace::ensure_workspace()?;
-    println!("  Ensured workspace directory: {}", config::workspace_dir().display());
+    println!(
+        "  Ensured workspace directory: {}",
+        config::workspace_dir().display()
+    );
 
     println!();
     println!("AER initialized successfully.");

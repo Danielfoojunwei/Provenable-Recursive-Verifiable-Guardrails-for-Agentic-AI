@@ -30,7 +30,10 @@ pub fn verify_bundle(bundle_dir: &Path) -> io::Result<VerificationResult> {
                         Err(e) => {
                             errors.push(VerificationError {
                                 kind: VerificationErrorKind::MalformedEntry,
-                                detail: format!("Line {}: payload serialize error: {e}", line_num + 1),
+                                detail: format!(
+                                    "Line {}: payload serialize error: {e}",
+                                    line_num + 1
+                                ),
                             });
                             continue;
                         }

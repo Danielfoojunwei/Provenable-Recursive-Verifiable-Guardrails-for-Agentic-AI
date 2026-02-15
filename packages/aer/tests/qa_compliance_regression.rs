@@ -141,7 +141,8 @@ fn qa_a02_mi_all_files_all_untrusted_principals() {
             assert!(
                 result.is_err(),
                 "A.8.3: {:?} write to {} must be DENIED",
-                principal, filename
+                principal,
+                filename
             );
 
             // Confirm file does not exist or was not created
@@ -354,13 +355,7 @@ fn qa_c02_audit_chain_attack_vectors() {
 
     // Build a 5-entry chain
     for i in 0..5 {
-        hooks::on_session_start(
-            &format!("agent-{i}"),
-            &format!("sess-{i}"),
-            "CLI",
-            None,
-        )
-        .unwrap();
+        hooks::on_session_start(&format!("agent-{i}"), &format!("sess-{i}"), "CLI", None).unwrap();
     }
 
     let entries = audit_chain::read_all_entries().unwrap();
@@ -436,7 +431,10 @@ fn qa_c03_canonicalization_consistency() {
     let c = json!({"emoji": "🔒", "newline": "a\nb", "tab": "a\tb"});
     let c1 = canonical::canonicalize(&c);
     let c2 = canonical::canonicalize(&c);
-    assert_eq!(c1, c2, "Special characters must canonicalize deterministically");
+    assert_eq!(
+        c1, c2,
+        "Special characters must canonicalize deterministically"
+    );
 
     // Null, bool, empty array, empty object
     let edge = json!({"n": null, "t": true, "f": false, "ea": [], "eo": {}});
@@ -523,7 +521,11 @@ fn qa_e01_pii_memory_protection() {
         )
         .unwrap();
 
-        assert!(result.is_err(), "GDPR Art.5(1)(f): {} poisoning must be denied", f);
+        assert!(
+            result.is_err(),
+            "GDPR Art.5(1)(f): {} poisoning must be denied",
+            f
+        );
     }
 
     // Verify files unchanged
@@ -551,14 +553,20 @@ fn qa_e02_deny_by_default_architecture() {
     let pack = policy::default_policy();
 
     // The first CPI rule must be a deny
-    let first_cpi = pack.rules.iter().find(|r| r.surface == GuardSurface::ControlPlane);
+    let first_cpi = pack
+        .rules
+        .iter()
+        .find(|r| r.surface == GuardSurface::ControlPlane);
     assert!(
         matches!(first_cpi, Some(r) if r.action == GuardVerdict::Deny),
         "GDPR Art.25: First CPI rule must be DENY"
     );
 
     // The first MI rule must be a deny
-    let first_mi = pack.rules.iter().find(|r| r.surface == GuardSurface::DurableMemory);
+    let first_mi = pack
+        .rules
+        .iter()
+        .find(|r| r.surface == GuardSurface::DurableMemory);
     assert!(
         matches!(first_mi, Some(r) if r.action == GuardVerdict::Deny),
         "GDPR Art.25: First MI rule must be DENY"
@@ -578,8 +586,15 @@ fn qa_e02_deny_by_default_architecture() {
         TaintFlags::empty(),
         false,
     );
-    assert_eq!(verdict, GuardVerdict::Deny, "GDPR Art.25: Empty policy must deny");
-    assert_eq!(rule_id, "default-deny", "GDPR Art.25: Must use default-deny rule");
+    assert_eq!(
+        verdict,
+        GuardVerdict::Deny,
+        "GDPR Art.25: Empty policy must deny"
+    );
+    assert_eq!(
+        rule_id, "default-deny",
+        "GDPR Art.25: Must use default-deny rule"
+    );
 }
 
 /// GDPR Article 32: Security of processing — encryption / hashing.
@@ -591,27 +606,30 @@ fn qa_e03_cryptographic_hash_correctness() {
     // Known test vectors from NIST
     let empty = sha256_hex(b"");
     assert_eq!(
-        empty,
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        empty, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "GDPR Art.32: SHA-256 of empty must match NIST vector"
     );
 
     let abc = sha256_hex(b"abc");
     assert_eq!(
-        abc,
-        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        abc, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
         "GDPR Art.32: SHA-256 of 'abc' must match NIST vector"
     );
 
     // All hashes must be 64 hex characters
     let hash = sha256_hex(b"test data for compliance");
-    assert_eq!(hash.len(), 64, "GDPR Art.32: Hash length must be 64 hex chars");
+    assert_eq!(
+        hash.len(),
+        64,
+        "GDPR Art.32: Hash length must be 64 hex chars"
+    );
     assert!(
         hash.chars().all(|c| c.is_ascii_hexdigit()),
         "GDPR Art.32: Hash must be lowercase hex"
     );
     assert_eq!(
-        hash, hash.to_lowercase(),
+        hash,
+        hash.to_lowercase(),
         "GDPR Art.32: Hash must be lowercase"
     );
 }
@@ -633,7 +651,8 @@ fn qa_f01_incident_bundle_completeness() {
     let _tmp = setup();
 
     // Simulate a full incident scenario
-    let session = hooks::on_session_start("agent-inc", "sess-inc", "WEB", Some("10.0.0.1")).unwrap();
+    let session =
+        hooks::on_session_start("agent-inc", "sess-inc", "WEB", Some("10.0.0.1")).unwrap();
 
     // Attacker tries CPI change (denied)
     let _ = hooks::on_control_plane_change(
@@ -681,7 +700,10 @@ fn qa_f01_incident_bundle_completeness() {
     let result = verify::verify_bundle(tmp_extract.path()).unwrap();
 
     assert!(result.valid, "A.5.24: Bundle must pass verification");
-    assert!(result.record_count >= 4, "A.5.24: Must contain >= 4 records");
+    assert!(
+        result.record_count >= 4,
+        "A.5.24: Must contain >= 4 records"
+    );
     assert!(
         result.audit_entries_checked >= 4,
         "A.5.24: Must contain >= 4 audit entries"
@@ -704,7 +726,9 @@ fn qa_f01_incident_bundle_completeness() {
     // Verify report contains denial information
     let report_content = fs::read_to_string(report_path).unwrap();
     assert!(
-        report_content.contains("Denied") || report_content.contains("denied") || report_content.contains("Deny"),
+        report_content.contains("Denied")
+            || report_content.contains("denied")
+            || report_content.contains("Deny"),
         "Art.33: Report must mention denials for breach documentation"
     );
 }
@@ -756,7 +780,10 @@ fn qa_f02_bundle_tamper_detection() {
         "A.5.28: Tampered bundle must FAIL verification"
     );
     assert!(
-        result.errors.iter().any(|e| e.kind == VerificationErrorKind::RecordHashMismatch),
+        result
+            .errors
+            .iter()
+            .any(|e| e.kind == VerificationErrorKind::RecordHashMismatch),
         "A.5.28: Must report RecordHashMismatch"
     );
 }
@@ -781,11 +808,23 @@ fn qa_g01_snapshot_rollback_fidelity() {
     // Create diverse content across all memory files
     let test_data: Vec<(&str, &[u8])> = vec![
         ("SOUL.md", b"# Soul\nI am trustworthy.\n"),
-        ("AGENTS.md", b"# Agents\n- agent-1: analyst\n- agent-2: coder\n"),
-        ("TOOLS.md", b"# Tools\n- read_file\n- write_file\n- search\n"),
+        (
+            "AGENTS.md",
+            b"# Agents\n- agent-1: analyst\n- agent-2: coder\n",
+        ),
+        (
+            "TOOLS.md",
+            b"# Tools\n- read_file\n- write_file\n- search\n",
+        ),
         ("USER.md", b"# User\nname: Alice\npreference: dark-mode\n"),
-        ("IDENTITY.md", b"# Identity\norg: ACME Corp\nrole: security-lead\n"),
-        ("HEARTBEAT.md", b"# Heartbeat\nlast_active: 2025-01-01T00:00:00Z\n"),
+        (
+            "IDENTITY.md",
+            b"# Identity\norg: ACME Corp\nrole: security-lead\n",
+        ),
+        (
+            "HEARTBEAT.md",
+            b"# Heartbeat\nlast_active: 2025-01-01T00:00:00Z\n",
+        ),
         ("MEMORY.md", b"# Memory\n- fact: sky is blue (verified)\n"),
     ];
 
@@ -805,10 +844,7 @@ fn qa_g01_snapshot_rollback_fidelity() {
     // Record original hashes
     let mut original_hashes = std::collections::HashMap::new();
     for (name, _) in &test_data {
-        original_hashes.insert(
-            name.to_string(),
-            sha256_file(&ws.join(name)).unwrap(),
-        );
+        original_hashes.insert(name.to_string(), sha256_file(&ws.join(name)).unwrap());
     }
 
     // Corrupt EVERY file
@@ -828,7 +864,10 @@ fn qa_g01_snapshot_rollback_fidelity() {
 
     // Rollback
     let report = rollback::rollback_to_snapshot(&manifest.snapshot_id).unwrap();
-    assert!(report.errors.is_empty(), "A.8.13: Rollback must have no errors");
+    assert!(
+        report.errors.is_empty(),
+        "A.8.13: Rollback must have no errors"
+    );
 
     // Verify every file restored to exact hash
     for (name, _) in &test_data {
@@ -872,8 +911,14 @@ fn qa_g02_rollback_restores_deleted_files() {
     let _report = rollback::rollback_to_snapshot(&manifest.snapshot_id).unwrap();
 
     // Files must be recreated
-    assert!(ws.join("SOUL.md").exists(), "Art.17: SOUL.md must be recreated");
-    assert!(ws.join("TOOLS.md").exists(), "Art.17: TOOLS.md must be recreated");
+    assert!(
+        ws.join("SOUL.md").exists(),
+        "Art.17: SOUL.md must be recreated"
+    );
+    assert!(
+        ws.join("TOOLS.md").exists(),
+        "Art.17: TOOLS.md must be recreated"
+    );
 
     // Content must match
     assert_eq!(
@@ -950,11 +995,7 @@ fn qa_h02_taint_bit_independence() {
         for (j, b) in all_flags.iter().enumerate() {
             if i != j {
                 assert_ne!(a, b, "Flags at {} and {} must be distinct", i, j);
-                assert!(
-                    !a.contains(*b),
-                    "Flag {} must not contain flag {}",
-                    i, j
-                );
+                assert!(!a.contains(*b), "Flag {} must not contain flag {}", i, j);
             }
         }
     }
@@ -972,7 +1013,10 @@ fn qa_h02_taint_bit_independence() {
     // Serialization roundtrip
     let json_val = serde_json::to_value(combined).unwrap();
     let deserialized: TaintFlags = serde_json::from_value(json_val).unwrap();
-    assert_eq!(combined, deserialized, "Taint flags must survive serde roundtrip");
+    assert_eq!(
+        combined, deserialized,
+        "Taint flags must survive serde roundtrip"
+    );
 }
 
 // ===========================================================================
@@ -1047,7 +1091,10 @@ fn qa_j01_data_minimization_in_records() {
 
     // Read all records and check none contain raw PII
     let all = records::read_all_records().unwrap();
-    let file_writes: Vec<_> = all.iter().filter(|r| r.record_type == RecordType::FileWrite).collect();
+    let file_writes: Vec<_> = all
+        .iter()
+        .filter(|r| r.record_type == RecordType::FileWrite)
+        .collect();
 
     for fw in &file_writes {
         let json_str = serde_json::to_string(&fw.payload).unwrap();
@@ -1095,22 +1142,53 @@ fn qa_k01_policy_serialization_roundtrip() {
         assert_eq!(o.id, l.id, "Rule ID must survive roundtrip");
         assert_eq!(o.surface, l.surface, "Rule surface must survive roundtrip");
         assert_eq!(o.action, l.action, "Rule action must survive roundtrip");
-        assert_eq!(o.description, l.description, "Rule description must survive roundtrip");
+        assert_eq!(
+            o.description, l.description,
+            "Rule description must survive roundtrip"
+        );
     }
 
     // Verify every rule produces the same evaluation result
     let test_cases = [
-        (GuardSurface::ControlPlane, Principal::Web, TaintFlags::empty(), false),
-        (GuardSurface::ControlPlane, Principal::User, TaintFlags::empty(), true),
-        (GuardSurface::DurableMemory, Principal::User, TaintFlags::UNTRUSTED, false),
-        (GuardSurface::DurableMemory, Principal::User, TaintFlags::empty(), false),
+        (
+            GuardSurface::ControlPlane,
+            Principal::Web,
+            TaintFlags::empty(),
+            false,
+        ),
+        (
+            GuardSurface::ControlPlane,
+            Principal::User,
+            TaintFlags::empty(),
+            true,
+        ),
+        (
+            GuardSurface::DurableMemory,
+            Principal::User,
+            TaintFlags::UNTRUSTED,
+            false,
+        ),
+        (
+            GuardSurface::DurableMemory,
+            Principal::User,
+            TaintFlags::empty(),
+            false,
+        ),
     ];
 
     for (surface, principal, taint, approved) in &test_cases {
         let (v1, id1, _) = policy::evaluate(&original, *surface, *principal, *taint, *approved);
         let (v2, id2, _) = policy::evaluate(&loaded, *surface, *principal, *taint, *approved);
-        assert_eq!(v1, v2, "Verdict must match for {:?}/{:?}", surface, principal);
-        assert_eq!(id1, id2, "Rule ID must match for {:?}/{:?}", surface, principal);
+        assert_eq!(
+            v1, v2,
+            "Verdict must match for {:?}/{:?}",
+            surface, principal
+        );
+        assert_eq!(
+            id1, id2,
+            "Rule ID must match for {:?}/{:?}",
+            surface, principal
+        );
     }
 }
 
@@ -1218,21 +1296,43 @@ fn qa_n01_record_serialization_roundtrip() {
     // Generate diverse record types
     hooks::on_session_start("serde-agent", "serde-sess", "CLI", None).unwrap();
     hooks::on_tool_call(
-        "serde-agent", "serde-sess", "tool1", Principal::User,
-        TaintFlags::empty(), json!({"key": "value"}), vec![],
-    ).unwrap();
+        "serde-agent",
+        "serde-sess",
+        "tool1",
+        Principal::User,
+        TaintFlags::empty(),
+        json!({"key": "value"}),
+        vec![],
+    )
+    .unwrap();
     hooks::on_tool_result(
-        "serde-agent", "serde-sess", "tool1", Principal::ToolAuth,
-        TaintFlags::TOOL_OUTPUT, json!({"result": 42}), vec![],
-    ).unwrap();
+        "serde-agent",
+        "serde-sess",
+        "tool1",
+        Principal::ToolAuth,
+        TaintFlags::TOOL_OUTPUT,
+        json!({"result": 42}),
+        vec![],
+    )
+    .unwrap();
     let _ = hooks::on_control_plane_change(
-        Principal::User, TaintFlags::empty(), true,
-        "test.key", json!({}), vec![],
-    ).unwrap();
+        Principal::User,
+        TaintFlags::empty(),
+        true,
+        "test.key",
+        json!({}),
+        vec![],
+    )
+    .unwrap();
     let _ = workspace::write_memory_file(
-        "MEMORY.md", b"test", Principal::User,
-        TaintFlags::empty(), true, vec![],
-    ).unwrap();
+        "MEMORY.md",
+        b"test",
+        Principal::User,
+        TaintFlags::empty(),
+        true,
+        vec![],
+    )
+    .unwrap();
     snapshot::create_snapshot("serde-snap", SnapshotScope::Full).unwrap();
 
     // Read all records and verify each one
@@ -1267,13 +1367,23 @@ fn qa_o01_dpia_report_generation() {
 
     // Generate mixed allow/deny events
     let _ = hooks::on_control_plane_change(
-        Principal::Web, TaintFlags::UNTRUSTED, false,
-        "skills.install", json!({}), vec![],
-    ).unwrap();
+        Principal::Web,
+        TaintFlags::UNTRUSTED,
+        false,
+        "skills.install",
+        json!({}),
+        vec![],
+    )
+    .unwrap();
     let _ = hooks::on_control_plane_change(
-        Principal::User, TaintFlags::empty(), true,
-        "skills.install", json!({}), vec![],
-    ).unwrap();
+        Principal::User,
+        TaintFlags::empty(),
+        true,
+        "skills.install",
+        json!({}),
+        vec![],
+    )
+    .unwrap();
 
     let all = records::read_all_records().unwrap();
     let entries = audit_chain::read_all_entries().unwrap();

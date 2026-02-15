@@ -50,8 +50,7 @@ pub fn export_bundle(
 
     let file = fs::File::create(&bundle_path)?;
     let mut zip = ZipWriter::new(file);
-    let options = SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     // Write manifest
     zip.start_file("manifest.json", options)?;
@@ -182,9 +181,9 @@ pub fn extract_bundle(bundle_path: &Path) -> io::Result<tempfile::TempDir> {
     let mut total_extracted: u64 = 0;
 
     for i in 0..archive.len() {
-        let mut entry = archive
-            .by_index(i)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Zip entry error: {e}")))?;
+        let mut entry = archive.by_index(i).map_err(|e| {
+            io::Error::new(io::ErrorKind::InvalidData, format!("Zip entry error: {e}"))
+        })?;
 
         let name = entry.name().to_string();
 
@@ -272,9 +271,7 @@ pub fn extract_bundle(bundle_path: &Path) -> io::Result<tempfile::TempDir> {
             if bytes_copied > ZIP_MAX_ENTRY_SIZE {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!(
-                        "zip entry {name} actual size exceeds limit ({bytes_copied} bytes)"
-                    ),
+                    format!("zip entry {name} actual size exceeds limit ({bytes_copied} bytes)"),
                 ));
             }
         }

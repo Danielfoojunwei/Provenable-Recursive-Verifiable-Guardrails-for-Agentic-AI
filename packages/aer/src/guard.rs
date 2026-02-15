@@ -28,7 +28,7 @@ struct RateLimiterState {
 fn check_denial_rate_limit() -> io::Result<()> {
     let mut lock = DENIAL_RATE_LIMITER
         .lock()
-        .map_err(|_| io::Error::new(io::ErrorKind::Other, "rate limiter lock poisoned"))?;
+        .map_err(|_| io::Error::other("rate limiter lock poisoned"))?;
 
     let now = Instant::now();
     let state = lock.get_or_insert_with(|| RateLimiterState {
@@ -45,15 +45,12 @@ fn check_denial_rate_limit() -> io::Result<()> {
     state.denial_count += 1;
 
     if state.denial_count > RATE_LIMIT_MAX_DENIALS {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!(
-                "Guard denial rate limit exceeded: {} denials in {} seconds. \
-                 Possible log flooding attack. Further evaluations are blocked \
-                 until the window resets.",
-                state.denial_count, RATE_LIMIT_WINDOW_SECS
-            ),
-        ));
+        return Err(io::Error::other(format!(
+            "Guard denial rate limit exceeded: {} denials in {} seconds. \
+             Possible log flooding attack. Further evaluations are blocked \
+             until the window resets.",
+            state.denial_count, RATE_LIMIT_WINDOW_SECS
+        )));
     }
 
     Ok(())

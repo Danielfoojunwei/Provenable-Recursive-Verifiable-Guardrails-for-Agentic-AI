@@ -103,7 +103,11 @@ fn test_import_accepts_valid_bundle() {
     std::fs::create_dir_all(&out_dir).unwrap();
 
     let result = aegx::bundle::import_zip(&zip_path, &out_dir);
-    assert!(result.is_ok(), "import_zip should accept valid bundle: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "import_zip should accept valid bundle: {:?}",
+        result.err()
+    );
 
     // Verify files were extracted
     assert!(out_dir.join("manifest.json").exists());
@@ -121,7 +125,10 @@ fn test_import_rejects_null_byte_in_name() {
     std::fs::create_dir_all(&out_dir).unwrap();
 
     let result = aegx::bundle::import_zip(&zip_path, &out_dir);
-    assert!(result.is_err(), "import_zip should reject null byte in name");
+    assert!(
+        result.is_err(),
+        "import_zip should reject null byte in name"
+    );
 }
 
 #[test]
@@ -143,8 +150,7 @@ fn test_import_rejects_windows_absolute_path() {
 #[test]
 fn test_import_rejects_deeply_nested_traversal() {
     // Attempt traversal via nested directories
-    let zip_bytes =
-        create_zip_with_entries(&[("a/b/c/../../../../etc/passwd", b"root:x:0:0")]);
+    let zip_bytes = create_zip_with_entries(&[("a/b/c/../../../../etc/passwd", b"root:x:0:0")]);
     let tmp = TempDir::new().unwrap();
     let zip_path = write_zip_to_temp(&zip_bytes, &tmp);
 

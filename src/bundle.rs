@@ -208,10 +208,7 @@ fn validate_zip_entry_name(name: &str) -> Result<(), String> {
     // Reject path traversal components
     for component in Path::new(name).components() {
         if let std::path::Component::ParentDir = component {
-            return Err(format!(
-                "zip entry contains path traversal (..): {}",
-                name
-            ));
+            return Err(format!("zip entry contains path traversal (..): {}", name));
         }
     }
 
@@ -345,9 +342,9 @@ pub fn import_zip(zip_path: &Path, out_dir: &Path) -> Result<(), String> {
         }
 
         // Check total extraction size limit
-        total_extracted = total_extracted.checked_add(entry.size()).ok_or_else(|| {
-            format!("total extraction size overflow at entry {}", name)
-        })?;
+        total_extracted = total_extracted
+            .checked_add(entry.size())
+            .ok_or_else(|| format!("total extraction size overflow at entry {}", name))?;
         if total_extracted > ZIP_MAX_TOTAL_SIZE {
             return Err(format!(
                 "total extraction size exceeds limit ({} > {} bytes)",
@@ -381,9 +378,10 @@ pub fn import_zip(zip_path: &Path, out_dir: &Path) -> Result<(), String> {
             }
 
             // Reject if the output path is a symlink on disk (defense-in-depth)
-            if out_path.exists() && fs::symlink_metadata(&out_path)
-                .map(|m| m.file_type().is_symlink())
-                .unwrap_or(false)
+            if out_path.exists()
+                && fs::symlink_metadata(&out_path)
+                    .map(|m| m.file_type().is_symlink())
+                    .unwrap_or(false)
             {
                 return Err(format!(
                     "output path is a symlink (rejected for security): {}",
