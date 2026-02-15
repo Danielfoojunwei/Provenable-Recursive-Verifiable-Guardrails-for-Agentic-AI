@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/aegx/v0.1/manifest.schema.json",
+  "title": "AEGX Bundle Manifest v0.1",
+  "description": "Manifest for an exported AEGX evidence bundle (.aegx.zip).",
+  "type": "object",
+  "required": ["bundle_id", "created_at", "format_version", "record_count", "audit_entry_count", "blob_count", "filters"],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID v4 identifying this bundle"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of bundle creation"
+    },
+    "format_version": {
+      "type": "string",
+      "const": "0.1",
+      "description": "AEGX bundle format version"
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of records included in the bundle"
+    },
+    "audit_entry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of audit chain entries included"
+    },
+    "blob_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of blob files included"
+    },
+    "filters": {
+      "type": "object",
+      "properties": {
+        "agent_id": { "type": "string" },
+        "since_time": { "type": "string", "format": "date-time" },
+        "since_snapshot": { "type": "string" }
+      },
+      "description": "Filters applied when generating this bundle"
+    }
+  }
+}

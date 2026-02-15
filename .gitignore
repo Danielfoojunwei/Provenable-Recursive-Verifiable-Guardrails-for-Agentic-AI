@@ -1,0 +1,5 @@
+/target
+/packages/aer/target
+*.swp
+*.swo
+.DS_Store
