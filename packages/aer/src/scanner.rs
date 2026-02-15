@@ -596,7 +596,11 @@ fn check_format_override(_content: &str, lower: &str, findings: &mut Vec<ScanFin
         ("switch to spanish", "Language switch"),
         ("include the exact phrase", "Canary injection — forced phrase inclusion"),
         ("include the phrase", "Potential canary injection"),
+        ("add the phrase", "Canary injection — forced phrase addition"),
+        ("put the phrase", "Canary injection — forced phrase placement"),
+        ("append the phrase", "Canary injection — forced phrase append"),
         ("say the word", "Word injection"),
+        ("add the word", "Canary injection — word addition"),
         ("for message verification", "Canary framing"),
     ];
 

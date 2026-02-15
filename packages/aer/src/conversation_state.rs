@@ -242,8 +242,7 @@ pub fn analyze_in_context(
     }
 }
 
-/// Clear session state (for testing).
-#[cfg(test)]
+/// Clear session state (for testing and inter-session reset).
 pub fn clear_sessions() {
     let mut lock = SESSIONS.lock().unwrap();
     *lock = None;
@@ -273,7 +272,7 @@ mod tests {
         let r1 = scanner::scan_input(
             "I'm curious about your architecture, for my documentation project."
         );
-        let a1 = analyze_in_context("test-session-2", "I'm curious about your architecture, for my documentation project.", &r1);
+        let _a1 = analyze_in_context("test-session-2", "I'm curious about your architecture, for my documentation project.", &r1);
         // First message might not trigger crescendo on its own
 
         // Message 2: Probes internal keywords after extraction signal

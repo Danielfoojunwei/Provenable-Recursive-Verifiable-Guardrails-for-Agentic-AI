@@ -451,12 +451,12 @@ fn zeroleaks_full_benchmark() {
     println!("━━━ LAYER 2: Output Guard vs Leaked Responses ━━━━━━━━━━━━━━━");
     let leaked_outputs = extraction_leaked_outputs();
     let mut output_blocked = 0;
-    let mut output_clean = 0;
+    let mut _output_clean = 0;
 
     for (name, response) in &leaked_outputs {
         let result = output_guard::scan_output(response, None);
         let status = if result.safe {
-            output_clean += 1;
+            _output_clean += 1;
             "SAFE (passed)"
         } else {
             output_blocked += 1;
@@ -540,7 +540,7 @@ fn zeroleaks_full_benchmark() {
     // output each attack produces, we use worst-case: only count
     // input blocks as definite defeats.
     let extraction_total = extraction.len();
-    let extraction_definite_blocks = extraction_blocked; // scanner Block verdict
+    let _extraction_definite_blocks = extraction_blocked; // scanner Block verdict
     // Suspicious = taint applied, policy may deny depending on principal
     // Clean = attack not detected
 
@@ -548,7 +548,7 @@ fn zeroleaks_full_benchmark() {
     // Injection attacks are defeated only by input blocking (output guard
     // doesn't help with behavioral injection).
     let injection_total = injection.len();
-    let injection_definite_blocks = injection_blocked;
+    let _injection_definite_blocks = injection_blocked;
 
     // ZeroLeaks original results:
     let zl_orig_extraction_success = 11; // out of 13
