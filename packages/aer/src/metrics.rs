@@ -294,8 +294,12 @@ impl Drop for EvalTimer {
 mod tests {
     use super::*;
 
+    /// Serialize metrics tests that mutate the process-global METRICS state.
+    static METRICS_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_metrics_recording() {
+        let _lock = METRICS_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_metrics();
 
         record_evaluation(
@@ -326,6 +330,7 @@ mod tests {
 
     #[test]
     fn test_percentiles() {
+        let _lock = METRICS_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_metrics();
 
         for i in 1..=100 {
@@ -347,6 +352,7 @@ mod tests {
 
     #[test]
     fn test_eval_timer() {
+        let _lock = METRICS_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_metrics();
 
         let timer = EvalTimer::start(GuardSurface::ControlPlane);
@@ -361,6 +367,7 @@ mod tests {
 
     #[test]
     fn test_recent_evaluations() {
+        let _lock = METRICS_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_metrics();
 
         for _ in 0..5 {
