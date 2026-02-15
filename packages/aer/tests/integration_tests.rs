@@ -12,7 +12,13 @@ use aer::verify;
 use aer::workspace;
 use serde_json::json;
 use std::fs;
+use std::sync::Mutex;
 use tempfile::TempDir;
+
+/// Serialize all tests that mutate the process-global OPENCLAW_STATE_DIR
+/// environment variable. Without this, parallel test threads race on the
+/// env var and corrupt each other's JSONL files.
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 /// Set up a temp directory as the OPENCLAW_STATE_DIR and initialize AER.
 fn setup_temp_env() -> TempDir {
@@ -33,6 +39,7 @@ fn setup_temp_env() -> TempDir {
 // ============================================================
 #[test]
 fn test_cpi_deny_untrusted_principal() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     // Attempt a control-plane change from a WEB principal
@@ -82,6 +89,7 @@ fn test_cpi_deny_untrusted_principal() {
 // ============================================================
 #[test]
 fn test_mi_deny_tainted_memory_write() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     let soul_path = config::workspace_dir().join("SOUL.md");
@@ -124,6 +132,7 @@ fn test_mi_deny_tainted_memory_write() {
 // ============================================================
 #[test]
 fn test_cpi_allow_user_change() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     // Attempt a control-plane change from USER principal
@@ -168,6 +177,7 @@ fn test_cpi_allow_user_change() {
 // ============================================================
 #[test]
 fn test_snapshot_mutate_rollback() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     // Create some workspace files
@@ -227,6 +237,7 @@ fn test_snapshot_mutate_rollback() {
 // ============================================================
 #[test]
 fn test_audit_chain_tamper_detection() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     // Generate some records to populate the audit chain
@@ -286,6 +297,7 @@ fn test_audit_chain_tamper_detection() {
 // ============================================================
 #[test]
 fn test_bundle_export_verify_roundtrip() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     // Generate some evidence
@@ -326,6 +338,7 @@ fn test_bundle_export_verify_roundtrip() {
 // ============================================================
 #[test]
 fn test_mi_allow_clean_user_write() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     // Write from USER with no taint
@@ -351,6 +364,7 @@ fn test_mi_allow_clean_user_write() {
 // ============================================================
 #[test]
 fn test_proxy_trust_misconfig_detection() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     // Simulate an overly permissive trustedProxies config
@@ -380,6 +394,7 @@ fn test_proxy_trust_misconfig_detection() {
 // ============================================================
 #[test]
 fn test_verify_live_state() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup_temp_env();
 
     // Create some records

@@ -27,7 +27,13 @@ use aer::verify;
 use aer::workspace;
 use serde_json::json;
 use std::fs;
+use std::sync::Mutex;
 use tempfile::TempDir;
+
+/// Serialize all tests that mutate the process-global OPENCLAW_STATE_DIR
+/// environment variable. Without this, parallel test threads race on the
+/// env var and corrupt each other's JSONL files.
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 // ---------------------------------------------------------------------------
 // Setup helper — isolated temp OPENCLAW_STATE_DIR per test
@@ -53,6 +59,7 @@ fn setup() -> TempDir {
 /// is denied control-plane access. Exhaustive enumeration.
 #[test]
 fn qa_a01_least_privilege_cpi_exhaustive() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let untrusted = [
@@ -109,6 +116,7 @@ fn qa_a01_least_privilege_cpi_exhaustive() {
 /// memory file. Exhaustive cross-product.
 #[test]
 fn qa_a02_mi_all_files_all_untrusted_principals() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let untrusted_principals = [
@@ -162,6 +170,7 @@ fn qa_a02_mi_all_files_all_untrusted_principals() {
 /// and an audit chain entry. No silent decisions.
 #[test]
 fn qa_b01_every_decision_logged() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     // Generate a deny
@@ -238,6 +247,7 @@ fn qa_b01_every_decision_logged() {
 /// Verify: tool calls and results are fully captured with provenance.
 #[test]
 fn qa_b02_tool_call_audit_completeness() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let session = hooks::on_session_start("qa-agent", "qa-sess", "CLI", None).unwrap();
@@ -292,6 +302,7 @@ fn qa_b02_tool_call_audit_completeness() {
 /// Modifying any field causes hash mismatch.
 #[test]
 fn qa_c01_record_hash_tamper_evidence() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     hooks::on_session_start("agent", "sess", "CLI", None).unwrap();
@@ -338,6 +349,7 @@ fn qa_c01_record_hash_tamper_evidence() {
 /// Verify: audit chain detects insertion, deletion, and reordering attacks.
 #[test]
 fn qa_c02_audit_chain_attack_vectors() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     // Build a 5-entry chain
@@ -444,6 +456,7 @@ fn qa_c03_canonicalization_consistency() {
 /// ControlPlaneChangeRequest with correct provenance linkage.
 #[test]
 fn qa_d01_change_provenance_chain() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let result = hooks::on_control_plane_change(
@@ -489,6 +502,7 @@ fn qa_d01_change_provenance_chain() {
 /// Tainted data from external/web sources cannot alter identity files.
 #[test]
 fn qa_e01_pii_memory_protection() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     // Pre-populate PII-sensitive files
@@ -531,6 +545,7 @@ fn qa_e01_pii_memory_protection() {
 /// allow-by-default. This tests the architectural principle.
 #[test]
 fn qa_e02_deny_by_default_architecture() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let pack = policy::default_policy();
@@ -614,6 +629,7 @@ fn qa_e03_cryptographic_hash_correctness() {
 /// chain, and report generation for breach notification support.
 #[test]
 fn qa_f01_incident_bundle_completeness() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     // Simulate a full incident scenario
@@ -699,6 +715,7 @@ fn qa_f01_incident_bundle_completeness() {
 /// Verify: bundle verification detects tampering with exported evidence.
 #[test]
 fn qa_f02_bundle_tamper_detection() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     hooks::on_session_start("agent-t", "sess-t", "CLI", None).unwrap();
@@ -756,6 +773,7 @@ fn qa_f02_bundle_tamper_detection() {
 /// byte-for-byte content, and hash verification passes post-rollback.
 #[test]
 fn qa_g01_snapshot_rollback_fidelity() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let ws = config::workspace_dir();
@@ -835,6 +853,7 @@ fn qa_g01_snapshot_rollback_fidelity() {
 /// Verify: deleted files are recreated during rollback.
 #[test]
 fn qa_g02_rollback_restores_deleted_files() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let ws = config::workspace_dir();
@@ -878,6 +897,7 @@ fn qa_g02_rollback_restores_deleted_files() {
 /// tainted provenance blocks memory commits even from USER principal.
 #[test]
 fn qa_h01_taint_propagation_conservative() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     // Taint flags from different sources combine
@@ -964,6 +984,7 @@ fn qa_h02_taint_bit_independence() {
 /// Verify: proxy trust misconfiguration detection for all known-bad patterns.
 #[test]
 fn qa_i01_proxy_misconfig_all_patterns() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let bad_configs = vec![
@@ -1009,6 +1030,7 @@ fn qa_i01_proxy_misconfig_all_patterns() {
 /// memory file operations. Raw content is NOT in the audit chain.
 #[test]
 fn qa_j01_data_minimization_in_records() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let sensitive_content = b"SSN: 123-45-6789\nDOB: 1990-01-01";
@@ -1055,6 +1077,7 @@ fn qa_j01_data_minimization_in_records() {
 /// Verify: policy YAML roundtrip preserves all rules without corruption.
 #[test]
 fn qa_k01_policy_serialization_roundtrip() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let original = policy::default_policy();
@@ -1101,6 +1124,7 @@ fn qa_k01_policy_serialization_roundtrip() {
 /// Verify: verify_live detects corruption in live state.
 #[test]
 fn qa_l01_live_verification_detects_corruption() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     // Build some state
@@ -1149,6 +1173,7 @@ fn qa_l01_live_verification_detects_corruption() {
 /// This prevents path traversal or arbitrary file write attacks.
 #[test]
 fn qa_m01_workspace_whitelist_enforcement() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     let invalid_files = [
@@ -1187,6 +1212,7 @@ fn qa_m01_workspace_whitelist_enforcement() {
 /// Verify: every record written to JSONL can be deserialized back.
 #[test]
 fn qa_n01_record_serialization_roundtrip() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     // Generate diverse record types
@@ -1236,6 +1262,7 @@ fn qa_n01_record_serialization_roundtrip() {
 /// risk analysis. Reports must be parseable JSON for automated DPIA tooling.
 #[test]
 fn qa_o01_dpia_report_generation() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
     // Generate mixed allow/deny events

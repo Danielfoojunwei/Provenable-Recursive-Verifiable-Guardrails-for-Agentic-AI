@@ -112,9 +112,14 @@ pub fn ensure_aer_dirs() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Serialize config tests that mutate the process-global env var.
+    static CFG_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_state_dir_env_override() {
+        let _lock = CFG_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let tmp = "/tmp/test-openclaw-state";
         std::env::set_var("OPENCLAW_STATE_DIR", tmp);
         assert_eq!(resolve_state_dir(), PathBuf::from(tmp));
@@ -123,6 +128,7 @@ mod tests {
 
     #[test]
     fn test_aer_subpaths() {
+        let _lock = CFG_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         std::env::set_var("OPENCLAW_STATE_DIR", "/tmp/oc");
         assert_eq!(aer_root(), PathBuf::from("/tmp/oc/.aer"));
         assert_eq!(policy_dir(), PathBuf::from("/tmp/oc/.aer/policy"));
