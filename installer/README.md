@@ -1,29 +1,29 @@
-# OpenClaw AER Installer
+# Provenable.ai AER Installer
 
-Open-source installer for [OpenClaw](https://github.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI) with **Agent Evidence & Recovery (AER)** guardrails. All tooling is written in Rust.
+Installer for [Provenable.ai](https://github.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI) with **Agent Evidence & Recovery (AER)** guardrails, compatible with OpenClaw and other agentic systems. All tooling is written in Rust.
 
 ## Quick Install
 
 ### macOS / Linux
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI/main/installer/install/install-openclaw-aer.sh | bash
+curl -sSL https://raw.githubusercontent.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI/main/installer/install/install-proven-aer.sh | bash
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI/main/installer/install/install-openclaw-aer.ps1 | iex
+irm https://raw.githubusercontent.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI/main/installer/install/install-proven-aer.ps1 | iex
 ```
 
 ### Pin a Specific Version
 
 ```bash
 # Unix
-bash install-openclaw-aer.sh --version 0.1.0
+bash install-proven-aer.sh --version 0.1.0
 
 # Windows
-.\install-openclaw-aer.ps1 -Version 0.1.0
+.\install-proven-aer.ps1 -Version 0.1.0
 ```
 
 ## Prerequisites
@@ -47,7 +47,7 @@ The installer applies security-safe defaults out of the box:
 
 1. **Fetches** the pinned version manifest (`manifest.json`)
 2. **Validates** the requested version is in the allowlist
-3. **Installs** OpenClaw via `npm install` with `--save-exact`
+3. **Installs** Proven via `npm install` with `--save-exact`
 4. **Verifies** the installed version matches the request
 5. **Writes** a security-safe configuration file
 6. **Creates** AER state directories for evidence recording
@@ -58,8 +58,8 @@ The installer applies security-safe defaults out of the box:
 ```
 installer/
 ├── install/                        # Installer scripts
-│   ├── install-openclaw-aer.sh         # macOS / Linux
-│   └── install-openclaw-aer.ps1        # Windows
+│   ├── install-proven-aer.sh         # macOS / Linux
+│   └── install-proven-aer.ps1        # Windows
 ├── manifest/
 │   └── manifest.json               # Pinned version manifest
 ├── tools/                          # Rust tooling
@@ -94,14 +94,14 @@ Verify installer integrity with SHA-256 checksums:
 
 ```bash
 # Unix
-sha256sum install-openclaw-aer.sh
+sha256sum install-proven-aer.sh
 # Compare with checksums.txt
 
 # macOS
-shasum -a 256 install-openclaw-aer.sh
+shasum -a 256 install-proven-aer.sh
 
 # Windows
-Get-FileHash install-openclaw-aer.ps1 -Algorithm SHA256
+Get-FileHash install-proven-aer.ps1 -Algorithm SHA256
 ```
 
 See [docs/VERIFY.md](docs/VERIFY.md) for detailed verification instructions.
@@ -142,7 +142,7 @@ cargo test --manifest-path tools/Cargo.toml -- --test-threads=1
 ### Run Smoke Tests
 
 ```bash
-chmod +x install/install-openclaw-aer.sh scripts/smoke_install_unix.sh
+chmod +x install/install-proven-aer.sh scripts/smoke_install_unix.sh
 bash scripts/smoke_install_unix.sh
 ```
 

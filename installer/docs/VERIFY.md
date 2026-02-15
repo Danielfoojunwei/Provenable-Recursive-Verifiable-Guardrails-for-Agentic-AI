@@ -1,6 +1,6 @@
 # Verification Guide
 
-This document explains how to verify the integrity of OpenClaw AER installer artifacts.
+This document explains how to verify the integrity of Provenable.ai AER installer artifacts.
 
 ## Checksum Verification
 
@@ -13,7 +13,7 @@ Every release includes a `checksums.txt` file containing SHA-256 hashes for all 
 curl -sSLO https://raw.githubusercontent.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI/main/installer/checksums.txt
 
 # Verify the installer script
-sha256sum install-openclaw-aer.sh
+sha256sum install-proven-aer.sh
 # Compare the output with the hash in checksums.txt
 
 # Or verify all artifacts at once (if you have them locally)
@@ -23,7 +23,7 @@ sha256sum -c checksums.txt
 On macOS (which uses `shasum` instead of `sha256sum`):
 
 ```bash
-shasum -a 256 install-openclaw-aer.sh
+shasum -a 256 install-proven-aer.sh
 # Compare with checksums.txt
 ```
 
@@ -31,7 +31,7 @@ shasum -a 256 install-openclaw-aer.sh
 
 ```powershell
 # Compute hash of installer script
-Get-FileHash install-openclaw-aer.ps1 -Algorithm SHA256
+Get-FileHash install-proven-aer.ps1 -Algorithm SHA256
 
 # Compare with checksums.txt
 Get-Content checksums.txt
@@ -43,7 +43,7 @@ The `manifest/manifest.json` file is the source of truth for:
 
 - **Installer version**: The version of the installer scripts
 - **Artifact checksums**: SHA-256 hashes of installer scripts
-- **Pinned versions**: Allowed OpenClaw versions
+- **Pinned versions**: Allowed Proven versions
 - **Default version**: The version installed when no `--version` flag is provided
 
 ### Validate Manifest Locally
@@ -99,7 +99,7 @@ These checks are enforced in `.github/workflows/ci.yml` under the `security-scan
 
 ## Pinned Version Allowlist
 
-The installer only installs versions listed in `manifest.json` under `openclaw.pinned_versions` with `"allowed": true`. This prevents supply chain attacks where a compromised npm package could be installed.
+The installer only installs versions listed in `manifest.json` under `proven.pinned_versions` with `"allowed": true`. This prevents supply chain attacks where a compromised npm package could be installed.
 
 To pin a new version:
 

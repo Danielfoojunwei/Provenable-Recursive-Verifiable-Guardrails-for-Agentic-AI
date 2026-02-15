@@ -1,5 +1,7 @@
+use crate::alerts::{self, ThreatCategory};
 use crate::audit_chain;
 use crate::config;
+use crate::metrics::EvalTimer;
 use crate::policy;
 use crate::records;
 use crate::types::*;
@@ -56,6 +58,29 @@ fn check_denial_rate_limit() -> io::Result<()> {
     Ok(())
 }
 
+/// Determine the threat category for a denial based on context.
+fn classify_threat(surface: GuardSurface, taint: TaintFlags) -> ThreatCategory {
+    if taint.contains(TaintFlags::INJECTION_SUSPECT) {
+        return ThreatCategory::InjectionSuspect;
+    }
+    match surface {
+        GuardSurface::ControlPlane => {
+            if taint.is_tainted() {
+                ThreatCategory::TaintBlock
+            } else {
+                ThreatCategory::CpiViolation
+            }
+        }
+        GuardSurface::DurableMemory => {
+            if taint.is_tainted() {
+                ThreatCategory::TaintBlock
+            } else {
+                ThreatCategory::MiViolation
+            }
+        }
+    }
+}
+
 /// Guard context holds the loaded policy and provides enforcement.
 pub struct Guard {
     policy: PolicyPack,
@@ -81,6 +106,7 @@ impl Guard {
     /// Evaluate a control-plane change request.
     /// Returns the guard decision record and whether the change is allowed.
     /// Denied requests are rate-limited to prevent log flooding attacks.
+    /// Emits a ThreatAlert on denial for the feedback loop.
     pub fn check_control_plane(
         &self,
         principal: Principal,
@@ -90,6 +116,8 @@ impl Guard {
         change_detail: serde_json::Value,
         parent_records: Vec<String>,
     ) -> io::Result<(GuardVerdict, TypedRecord)> {
+        let timer = EvalTimer::start(GuardSurface::ControlPlane);
+
         let (verdict, rule_id, rationale) = policy::evaluate(
             &self.policy,
             GuardSurface::ControlPlane,
@@ -132,12 +160,22 @@ impl Guard {
 
         audit_chain::emit_audit(&record.record_id)?;
 
+        // Record metrics
+        timer.finish(verdict);
+
+        // Emit threat alert on denial
+        if verdict == GuardVerdict::Deny {
+            let category = classify_threat(GuardSurface::ControlPlane, taint);
+            let _ = alerts::emit_alert(category, &detail, &record.record_id, config_key);
+        }
+
         Ok((verdict, record))
     }
 
     /// Evaluate a memory write request.
     /// Returns the guard decision record and whether the write is allowed.
     /// Denied requests are rate-limited to prevent log flooding attacks.
+    /// Emits a ThreatAlert on denial for the feedback loop.
     pub fn check_memory_write(
         &self,
         principal: Principal,
@@ -147,6 +185,8 @@ impl Guard {
         content_hash: &str,
         parent_records: Vec<String>,
     ) -> io::Result<(GuardVerdict, TypedRecord)> {
+        let timer = EvalTimer::start(GuardSurface::DurableMemory);
+
         let (verdict, rule_id, rationale) = policy::evaluate(
             &self.policy,
             GuardSurface::DurableMemory,
@@ -189,6 +229,15 @@ impl Guard {
         )?;
 
         audit_chain::emit_audit(&record.record_id)?;
+
+        // Record metrics
+        timer.finish(verdict);
+
+        // Emit threat alert on denial
+        if verdict == GuardVerdict::Deny {
+            let category = classify_threat(GuardSurface::DurableMemory, taint);
+            let _ = alerts::emit_alert(category, &detail, &record.record_id, file_path);
+        }
 
         Ok((verdict, record))
     }

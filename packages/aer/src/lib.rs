@@ -1,3 +1,4 @@
+pub mod alerts;
 pub mod audit_chain;
 pub mod bundle;
 pub mod canonical;
@@ -5,7 +6,9 @@ pub mod cli;
 pub mod config;
 pub mod guard;
 pub mod hooks;
+pub mod metrics;
 pub mod policy;
+pub mod prove;
 pub mod records;
 pub mod report;
 pub mod rollback;

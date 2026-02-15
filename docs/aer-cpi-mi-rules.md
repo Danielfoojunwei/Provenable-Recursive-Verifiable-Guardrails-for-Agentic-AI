@@ -1,8 +1,8 @@
-# CPI/MI Guard Rules — OpenClaw Surface Mapping
+# CPI/MI Guard Rules — Provenable.ai Surface Mapping (OpenClaw Integration)
 
 ## Overview
 
-AER enforces Control-Plane Integrity (CPI) and Memory Integrity (MI) at structural chokepoints in the OpenClaw runtime. This document maps guard rules to specific OpenClaw surfaces.
+AER enforces Control-Plane Integrity (CPI) and Memory Integrity (MI) at structural chokepoints in the Provenable.ai runtime (compatible with OpenClaw and other agentic systems). This document maps guard rules to specific OpenClaw surfaces.
 
 ## Trust Lattice
 

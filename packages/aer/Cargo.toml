@@ -3,10 +3,10 @@ name = "aer"
 version = "0.1.0"
 edition = "2021"
 description = "Agent Evidence & Recovery (AER) — AEGX Recorder, CPI/MI Guard, RVU Rollback"
-license = "MIT"
+license = "LicenseRef-Proprietary"
 
 [[bin]]
-name = "openclaw-aer"
+name = "proven-aer"
 path = "src/main.rs"
 
 [lib]
@@ -31,3 +31,8 @@ tempfile = "3"
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "guard_bench"
+harness = false

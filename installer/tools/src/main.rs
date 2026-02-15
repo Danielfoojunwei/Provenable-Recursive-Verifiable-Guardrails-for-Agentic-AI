@@ -7,7 +7,7 @@ mod pin;
 
 #[derive(Parser)]
 #[command(name = "installer-tools")]
-#[command(about = "OpenClaw AER installer tooling — validate, checksum, pin")]
+#[command(about = "Provenable.ai AER installer tooling — validate, checksum, pin")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -27,9 +27,9 @@ enum Commands {
         #[arg(long)]
         repo_root: Option<String>,
     },
-    /// Pin a new OpenClaw version in the manifest
+    /// Pin a new Proven version in the manifest
     PinVersion {
-        /// OpenClaw version to pin (X.Y.Z)
+        /// Proven version to pin (X.Y.Z)
         #[arg(long)]
         version: String,
         /// Also set as default version

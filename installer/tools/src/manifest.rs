@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 pub struct Manifest {
     pub schema_version: String,
     pub installer: InstallerSection,
-    pub openclaw: OpenClawSection,
+    pub proven: ProvenSection,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ pub struct ArtifactEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenClawSection {
+pub struct ProvenSection {
     pub install_mode: String,
     pub pinned_versions: Vec<PinnedVersion>,
     pub default_version: String,

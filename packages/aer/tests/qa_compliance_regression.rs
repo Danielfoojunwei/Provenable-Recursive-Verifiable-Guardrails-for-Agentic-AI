@@ -30,17 +30,17 @@ use std::fs;
 use std::sync::Mutex;
 use tempfile::TempDir;
 
-/// Serialize all tests that mutate the process-global OPENCLAW_STATE_DIR
+/// Serialize all tests that mutate the process-global PRV_STATE_DIR
 /// environment variable. Without this, parallel test threads race on the
 /// env var and corrupt each other's JSONL files.
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 // ---------------------------------------------------------------------------
-// Setup helper — isolated temp OPENCLAW_STATE_DIR per test
+// Setup helper — isolated temp PRV_STATE_DIR per test
 // ---------------------------------------------------------------------------
 fn setup() -> TempDir {
     let tmp = TempDir::new().expect("create temp dir");
-    std::env::set_var("OPENCLAW_STATE_DIR", tmp.path().to_str().unwrap());
+    std::env::set_var("PRV_STATE_DIR", tmp.path().to_str().unwrap());
     config::ensure_aer_dirs().expect("ensure aer dirs");
     let default = policy::default_policy();
     policy::save_policy(&default, &config::default_policy_file()).expect("save policy");

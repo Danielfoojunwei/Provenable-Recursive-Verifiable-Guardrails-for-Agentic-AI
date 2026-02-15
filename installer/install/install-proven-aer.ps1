@@ -1,10 +1,10 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Install OpenClaw AER on Windows.
+    Install Provenable.ai AER on Windows.
 .DESCRIPTION
     Downloads the pinned manifest, verifies the version allowlist,
-    installs OpenClaw via npm with security-safe defaults, and
+    installs Provenable.ai via npm with security-safe defaults, and
     initialises the AER state directory.
 .NOTES
     MIT License — Copyright (c) 2026 Daniel Foo Jun Wei
@@ -29,15 +29,15 @@ $ErrorActionPreference = "Stop"
 
 # ── Defaults ──────────────────────────────────────────────────────
 $InstallerVersion = "0.1.0"
-$ManifestUrl = if ($env:OPENCLAW_MANIFEST_URL) { $env:OPENCLAW_MANIFEST_URL } else {
+$ManifestUrl = if ($env:PRV_MANIFEST_URL) { $env:PRV_MANIFEST_URL } else {
     "https://raw.githubusercontent.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI/main/installer/manifest/manifest.json"
 }
 if (-not $InstallDir) {
-    $InstallDir = if ($env:OPENCLAW_INSTALL_DIR) { $env:OPENCLAW_INSTALL_DIR } else {
-        Join-Path $env:USERPROFILE ".openclaw"
+    $InstallDir = if ($env:PRV_INSTALL_DIR) { $env:PRV_INSTALL_DIR } else {
+        Join-Path $env:USERPROFILE ".proven"
     }
 }
-if (-not $SkipChecksum -and $env:OPENCLAW_SKIP_CHECKSUM -eq "true") {
+if (-not $SkipChecksum -and $env:PRV_SKIP_CHECKSUM -eq "true") {
     $SkipChecksum = [switch]::Present
 }
 $NodeMinMajor = 22
@@ -53,20 +53,20 @@ function Write-Fatal { param([string]$Msg) Write-Host "ERROR $Msg" -ForegroundCo
 
 function Show-Usage {
     @"
-Usage: install-openclaw-aer.ps1 [OPTIONS]
+Usage: install-proven-aer.ps1 [OPTIONS]
 
-Install OpenClaw with AER (Agent Evidence & Recovery) guardrails.
+Install Provenable.ai with AER (Agent Evidence & Recovery) guardrails.
 
 Options:
-  -Version VER       Pin a specific OpenClaw version (X.Y.Z)
-  -InstallDir DIR    Installation directory (default: ~\.openclaw)
+  -Version VER       Pin a specific Proven version (X.Y.Z)
+  -InstallDir DIR    Installation directory (default: ~\.proven)
   -SkipChecksum      Skip SHA-256 manifest verification (NOT recommended)
   -Help              Show this help message
 
 Environment Variables:
-  OPENCLAW_MANIFEST_URL   Override manifest fetch URL
-  OPENCLAW_INSTALL_DIR    Override installation directory
-  OPENCLAW_SKIP_CHECKSUM  Set to "true" to skip checksums
+  PRV_MANIFEST_URL   Override manifest fetch URL
+  PRV_INSTALL_DIR    Override installation directory
+  PRV_SKIP_CHECKSUM  Set to "true" to skip checksums
 
 Security Defaults:
   - Binds to 127.0.0.1 only (no 0.0.0.0)
@@ -103,7 +103,7 @@ Write-Ok "Node.js v$NodeVersion detected (>= $NodeMinMajor required)"
 # ── Fetch manifest ────────────────────────────────────────────────
 Write-Info "Fetching manifest from $ManifestUrl"
 
-$TmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("openclaw-install-" + [guid]::NewGuid().ToString("N").Substring(0,8))
+$TmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("proven-install-" + [guid]::NewGuid().ToString("N").Substring(0,8))
 New-Item -ItemType Directory -Path $TmpDir -Force | Out-Null
 
 try {
@@ -127,12 +127,12 @@ try {
         Write-Fatal "Unsupported manifest schema_version: $($Manifest.schema_version)"
     }
 
-    if ($Manifest.openclaw.install_mode -ne "npm") {
-        Write-Fatal "Unsupported install_mode: $($Manifest.openclaw.install_mode)"
+    if ($Manifest.proven.install_mode -ne "npm") {
+        Write-Fatal "Unsupported install_mode: $($Manifest.proven.install_mode)"
     }
 
-    $DefaultVersion = $Manifest.openclaw.default_version
-    $AllowedVersions = @($Manifest.openclaw.pinned_versions | Where-Object { $_.allowed -eq $true } | ForEach-Object { $_.version })
+    $DefaultVersion = $Manifest.proven.default_version
+    $AllowedVersions = @($Manifest.proven.pinned_versions | Where-Object { $_.allowed -eq $true } | ForEach-Object { $_.version })
 
     # Determine target version
     $TargetVersion = if ($Version) { $Version } else { $DefaultVersion }
@@ -144,11 +144,11 @@ try {
     Write-Ok "Version $TargetVersion is in the pinned allowlist"
 
     # Check Node.js engine constraint
-    $VersionEntry = $Manifest.openclaw.pinned_versions | Where-Object { $_.version -eq $TargetVersion } | Select-Object -First 1
+    $VersionEntry = $Manifest.proven.pinned_versions | Where-Object { $_.version -eq $TargetVersion } | Select-Object -First 1
     $EnginesNodeMin = if ($VersionEntry.engines_node_min) { $VersionEntry.engines_node_min } else { ">=22.0.0" }
     $EnginesMajor = [int](($EnginesNodeMin -replace '^>=', '').Split('.')[0])
     if ($NodeMajor -lt $EnginesMajor) {
-        Write-Fatal "OpenClaw $TargetVersion requires Node.js >= $($EnginesNodeMin -replace '^>=', '') (found $NodeVersion)"
+        Write-Fatal "Proven $TargetVersion requires Node.js >= $($EnginesNodeMin -replace '^>=', '') (found $NodeVersion)"
     }
 
     # ── Checksum verification ─────────────────────────────────────
@@ -163,10 +163,10 @@ try {
     Write-Info "Installing to $InstallDir"
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
-    # ── Install OpenClaw via npm ──────────────────────────────────
-    Write-Info "Installing openclaw@$TargetVersion via npm..."
+    # ── Install Proven via npm ────────────────────────────────────
+    Write-Info "Installing proven@$TargetVersion via npm..."
 
-    $npmArgs = @("install", "--prefix", $InstallDir, "openclaw@$TargetVersion", "--save-exact")
+    $npmArgs = @("install", "--prefix", $InstallDir, "proven@$TargetVersion", "--save-exact")
     $npmProcess = Start-Process -FilePath "npm" -ArgumentList $npmArgs -Wait -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $TmpDir "npm-stdout.txt") -RedirectStandardError (Join-Path $TmpDir "npm-stderr.txt")
 
     if ($npmProcess.ExitCode -ne 0) {
@@ -174,11 +174,11 @@ try {
         Write-Fatal "npm install failed (exit $($npmProcess.ExitCode)): $npmErr"
     }
 
-    $ModulePath = Join-Path $InstallDir "node_modules" "openclaw"
+    $ModulePath = Join-Path $InstallDir "node_modules" "proven"
     if (-not (Test-Path $ModulePath)) {
-        Write-Fatal "npm install succeeded but openclaw module not found"
+        Write-Fatal "npm install succeeded but proven module not found"
     }
-    Write-Ok "openclaw@$TargetVersion installed"
+    Write-Ok "proven@$TargetVersion installed"
 
     # ── Verify installed version ──────────────────────────────────
     $PkgJson = Join-Path $ModulePath "package.json"
@@ -192,7 +192,7 @@ try {
     $ConfigDir = Join-Path $InstallDir "config"
     New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
 
-    $ConfigFile = Join-Path $ConfigDir "openclaw.json"
+    $ConfigFile = Join-Path $ConfigDir "proven.json"
     $NowUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
     $Config = @{
@@ -230,23 +230,23 @@ try {
     $BinDir = Join-Path $InstallDir "bin"
     New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
 
-    $WrapperCmd = Join-Path $BinDir "openclaw.cmd"
+    $WrapperCmd = Join-Path $BinDir "proven.cmd"
     @"
 @echo off
-REM OpenClaw wrapper — generated by install-openclaw-aer.ps1
-set "OPENCLAW_HOME=$InstallDir"
-set "OPENCLAW_CONFIG=$ConfigFile"
-set "OPENCLAW_STATE_DIR=$AerState"
-node "$InstallDir\node_modules\openclaw\bin\openclaw.js" %*
+REM Provenable.ai wrapper — generated by install-proven-aer.ps1
+set "PRV_HOME=$InstallDir"
+set "PRV_CONFIG=$ConfigFile"
+set "PRV_STATE_DIR=$AerState"
+node "$InstallDir\node_modules\proven\bin\proven.js" %*
 "@ | Set-Content -Path $WrapperCmd -Encoding ASCII
 
-    $WrapperPs1 = Join-Path $BinDir "openclaw.ps1"
+    $WrapperPs1 = Join-Path $BinDir "proven.ps1"
     @"
-# OpenClaw wrapper — generated by install-openclaw-aer.ps1
-`$env:OPENCLAW_HOME = "$InstallDir"
-`$env:OPENCLAW_CONFIG = "$ConfigFile"
-`$env:OPENCLAW_STATE_DIR = "$AerState"
-& node "$InstallDir\node_modules\openclaw\bin\openclaw.js" @args
+# Provenable.ai wrapper — generated by install-proven-aer.ps1
+`$env:PRV_HOME = "$InstallDir"
+`$env:PRV_CONFIG = "$ConfigFile"
+`$env:PRV_STATE_DIR = "$AerState"
+& node "$InstallDir\node_modules\proven\bin\proven.js" @args
 "@ | Set-Content -Path $WrapperPs1 -Encoding UTF8
 
     Write-Ok "Wrapper scripts created at $BinDir"
@@ -255,7 +255,7 @@ node "$InstallDir\node_modules\openclaw\bin\openclaw.js" %*
     $ReceiptFile = Join-Path $InstallDir ".install-receipt.json"
     @{
         installer_version = $InstallerVersion
-        openclaw_version = $TargetVersion
+        proven_version = $TargetVersion
         node_version = $NodeVersion
         install_dir = $InstallDir
         installed_at = $NowUtc
@@ -271,7 +271,7 @@ node "$InstallDir\node_modules\openclaw\bin\openclaw.js" %*
     Write-Host ""
     Write-Host "Installation complete!" -ForegroundColor Green
     Write-Host ""
-    Write-Host "  OpenClaw:  v$TargetVersion"
+    Write-Host "  Proven:    v$TargetVersion"
     Write-Host "  Location:  $InstallDir"
     Write-Host "  Config:    $ConfigFile"
     Write-Host "  AER State: $AerState"

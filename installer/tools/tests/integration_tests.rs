@@ -22,15 +22,15 @@ fn setup_test_repo() -> TempDir {
   "installer": {
     "version": "0.1.0",
     "artifacts": {
-      "install-openclaw-aer.sh": {
+      "install-proven-aer.sh": {
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
       },
-      "install-openclaw-aer.ps1": {
+      "install-proven-aer.ps1": {
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
       }
     }
   },
-  "openclaw": {
+  "proven": {
     "install_mode": "npm",
     "pinned_versions": [
       {
@@ -50,12 +50,12 @@ fn setup_test_repo() -> TempDir {
     // install/ — dummy artifacts
     fs::create_dir_all(root.join("install")).unwrap();
     fs::write(
-        root.join("install").join("install-openclaw-aer.sh"),
+        root.join("install").join("install-proven-aer.sh"),
         "#!/bin/bash\necho test\n",
     )
     .unwrap();
     fs::write(
-        root.join("install").join("install-openclaw-aer.ps1"),
+        root.join("install").join("install-proven-aer.ps1"),
         "Write-Host test\n",
     )
     .unwrap();
@@ -126,7 +126,7 @@ fn validate_fails_on_invalid_sha256() {
 
     let mut manifest: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
-    manifest["installer"]["artifacts"]["install-openclaw-aer.sh"]["sha256"] =
+    manifest["installer"]["artifacts"]["install-proven-aer.sh"]["sha256"] =
         serde_json::json!("not-a-hash");
     fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
 
@@ -148,7 +148,7 @@ fn validate_fails_on_missing_artifact() {
     manifest["installer"]["artifacts"]
         .as_object_mut()
         .unwrap()
-        .remove("install-openclaw-aer.sh");
+        .remove("install-proven-aer.sh");
     fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
 
     Command::cargo_bin("installer-tools")
@@ -166,7 +166,7 @@ fn validate_fails_on_bad_install_mode() {
 
     let mut manifest: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
-    manifest["openclaw"]["install_mode"] = serde_json::json!("docker");
+    manifest["proven"]["install_mode"] = serde_json::json!("docker");
     fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
 
     Command::cargo_bin("installer-tools")
@@ -184,7 +184,7 @@ fn validate_fails_on_empty_pinned_versions() {
 
     let mut manifest: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
-    manifest["openclaw"]["pinned_versions"] = serde_json::json!([]);
+    manifest["proven"]["pinned_versions"] = serde_json::json!([]);
     fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
 
     Command::cargo_bin("installer-tools")
@@ -202,7 +202,7 @@ fn validate_fails_when_default_not_allowed() {
 
     let mut manifest: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
-    manifest["openclaw"]["pinned_versions"][0]["allowed"] = serde_json::json!(false);
+    manifest["proven"]["pinned_versions"][0]["allowed"] = serde_json::json!(false);
     fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
 
     Command::cargo_bin("installer-tools")
@@ -220,7 +220,7 @@ fn validate_fails_on_bad_engines_node_min() {
 
     let mut manifest: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
-    manifest["openclaw"]["pinned_versions"][0]["engines_node_min"] =
+    manifest["proven"]["pinned_versions"][0]["engines_node_min"] =
         serde_json::json!("22.0.0");
     fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
 
@@ -251,8 +251,8 @@ fn gen_checksums_updates_manifest_and_writes_file() {
     assert!(checksums_path.exists(), "checksums.txt should exist");
 
     let checksums = fs::read_to_string(&checksums_path).unwrap();
-    assert!(checksums.contains("install-openclaw-aer.sh"));
-    assert!(checksums.contains("install-openclaw-aer.ps1"));
+    assert!(checksums.contains("install-proven-aer.sh"));
+    assert!(checksums.contains("install-proven-aer.ps1"));
     assert!(checksums.contains("manifest.json"));
 
     // Verify manifest was updated with real hashes
@@ -261,7 +261,7 @@ fn gen_checksums_updates_manifest_and_writes_file() {
     )
     .unwrap();
 
-    let sh_hash = manifest["installer"]["artifacts"]["install-openclaw-aer.sh"]["sha256"]
+    let sh_hash = manifest["installer"]["artifacts"]["install-proven-aer.sh"]["sha256"]
         .as_str()
         .unwrap();
     assert_ne!(
@@ -276,7 +276,7 @@ fn gen_checksums_updates_manifest_and_writes_file() {
 fn gen_checksums_fails_on_missing_artifact() {
     let tmp = setup_test_repo();
     // Remove one artifact
-    fs::remove_file(tmp.path().join("install").join("install-openclaw-aer.sh")).unwrap();
+    fs::remove_file(tmp.path().join("install").join("install-proven-aer.sh")).unwrap();
 
     let root = tmp.path().to_string_lossy().to_string();
 
@@ -313,7 +313,7 @@ fn pin_version_adds_new_version() {
     )
     .unwrap();
 
-    let pinned = manifest["openclaw"]["pinned_versions"].as_array().unwrap();
+    let pinned = manifest["proven"]["pinned_versions"].as_array().unwrap();
     assert_eq!(pinned.len(), 2, "Should have 2 pinned versions");
     assert_eq!(pinned[1]["version"].as_str().unwrap(), "1.2.3");
     assert!(pinned[1]["allowed"].as_bool().unwrap());
@@ -343,7 +343,7 @@ fn pin_version_with_set_default() {
     .unwrap();
 
     assert_eq!(
-        manifest["openclaw"]["default_version"].as_str().unwrap(),
+        manifest["proven"]["default_version"].as_str().unwrap(),
         "2.0.0"
     );
 }
@@ -390,7 +390,7 @@ fn pin_version_updates_existing() {
     .unwrap();
 
     // Should still have only 1 pinned version (not a duplicate)
-    let pinned = manifest["openclaw"]["pinned_versions"].as_array().unwrap();
+    let pinned = manifest["proven"]["pinned_versions"].as_array().unwrap();
     assert_eq!(pinned.len(), 1);
 }
 
@@ -398,7 +398,7 @@ fn pin_version_updates_existing() {
 
 #[test]
 fn installer_sh_has_security_defaults() {
-    let sh_path = repo_root().join("install").join("install-openclaw-aer.sh");
+    let sh_path = repo_root().join("install").join("install-proven-aer.sh");
     if !sh_path.exists() {
         // Skip if running from a different context
         return;
@@ -420,7 +420,7 @@ fn installer_sh_has_security_defaults() {
 
 #[test]
 fn installer_ps1_has_security_defaults() {
-    let ps1_path = repo_root().join("install").join("install-openclaw-aer.ps1");
+    let ps1_path = repo_root().join("install").join("install-proven-aer.ps1");
     if !ps1_path.exists() {
         return;
     }

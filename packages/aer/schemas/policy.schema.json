@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://openclaw.dev/schemas/aegx/v0.1/policy.schema.json",
+  "$id": "https://provenable.ai/schemas/aegx/v0.1/policy.schema.json",
   "title": "AER Policy Pack v0.1",
   "description": "Policy pack controlling CPI/MI guard enforcement in AER.",
   "type": "object",

@@ -1,4 +1,4 @@
-# Provable Recursive Verifiable Guardrails for Agentic AI
+# Provenable.ai — Recursive Verifiable Guardrails for Agentic AI
 
 Structural security enforcement for agentic AI systems. This project provides
 the **AEGX v0.1** tamper-evident evidence bundle format and the **Agent Evidence
@@ -187,7 +187,7 @@ Policy loading now enforces three layers of protection:
 
 `resolve_state_dir()` no longer falls back to `/tmp` when `HOME` is unset.
 The process panics with a clear error message directing the operator to set
-`HOME`, `OPENCLAW_HOME`, or `OPENCLAW_STATE_DIR`.
+`HOME`, `PRV_HOME`, or `PRV_STATE_DIR`.
 
 ### Resolved: Guard Rate Limiting
 
@@ -355,14 +355,14 @@ aegx summarize my-bundle
 The AER subsystem has its own CLI for runtime operations:
 
 ```bash
-openclaw-aer init                           # Initialize AER
-openclaw-aer status                         # Show status
-openclaw-aer snapshot create <name>         # Create snapshot
-openclaw-aer snapshot list                  # List snapshots
-openclaw-aer rollback <snapshot-id>         # Rollback to snapshot
-openclaw-aer bundle export                  # Export evidence bundle
-openclaw-aer verify <path.aegx.zip>         # Verify bundle integrity
-openclaw-aer report <path.aegx.zip>         # Generate report
+proven-aer init                           # Initialize AER
+proven-aer status                         # Show status
+proven-aer snapshot create <name>         # Create snapshot
+proven-aer snapshot list                  # List snapshots
+proven-aer rollback <snapshot-id>         # Rollback to snapshot
+proven-aer bundle export                  # Export evidence bundle
+proven-aer verify <path.aegx.zip>         # Verify bundle integrity
+proven-aer report <path.aegx.zip>         # Generate report
 ```
 
 ## Verification
@@ -458,4 +458,7 @@ fuzz/                 # Fuzz testing targets
 
 ## License
 
-[MIT](LICENSE)
+Copyright (c) 2026 Daniel Foo Jun Wei / Provenable.ai. All rights reserved.
+
+This software and the AEGX format specification are proprietary to Provenable.ai.
+See [LICENSE](LICENSE) for full terms. Use requires a written license agreement.

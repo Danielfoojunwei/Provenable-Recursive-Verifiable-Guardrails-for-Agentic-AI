@@ -251,7 +251,7 @@ my_session.aegx.zip
 
 ## 8. AER Bundle Extensions
 
-AER bundles (exported by `openclaw-aer bundle export`) include additional files:
+AER bundles (exported by `proven-aer bundle export`) include additional files:
 
 ```
 incident.aegx.zip

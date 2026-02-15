@@ -4,7 +4,7 @@ use std::process::Command;
 /// Verify version exists on npm and return the exact version string.
 fn npm_view_version(version: &str) -> Result<String, String> {
     let output = Command::new("npm")
-        .args(["view", &format!("openclaw@{version}"), "version"])
+        .args(["view", &format!("proven@{version}"), "version"])
         .output()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
@@ -17,7 +17,7 @@ fn npm_view_version(version: &str) -> Result<String, String> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!(
-            "npm view failed for openclaw@{version}: {stderr}"
+            "npm view failed for proven@{version}: {stderr}"
         ));
     }
 
@@ -29,7 +29,7 @@ fn npm_view_engines(version: &str) -> String {
     let default = ">=22.0.0".to_string();
 
     let output = match Command::new("npm")
-        .args(["view", &format!("openclaw@{version}"), "engines", "--json"])
+        .args(["view", &format!("proven@{version}"), "engines", "--json"])
         .output()
     {
         Ok(o) => o,
@@ -81,7 +81,7 @@ pub fn run(
 
     // Check if version already pinned
     if let Some(existing) = data
-        .openclaw
+        .proven
         .pinned_versions
         .iter_mut()
         .find(|e| e.version == version)
@@ -90,7 +90,7 @@ pub fn run(
         existing.allowed = true;
         existing.engines_node_min = engines_node;
     } else {
-        data.openclaw.pinned_versions.push(PinnedVersion {
+        data.proven.pinned_versions.push(PinnedVersion {
             version: version.clone(),
             engines_node_min: engines_node,
             notes: "Pinned via installer-tools pin-version".to_string(),
@@ -100,7 +100,7 @@ pub fn run(
     }
 
     if set_default {
-        data.openclaw.default_version = version.clone();
+        data.proven.default_version = version.clone();
         println!("Set default_version to {version}.");
     }
 

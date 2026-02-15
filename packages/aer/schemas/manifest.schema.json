@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://openclaw.dev/schemas/aegx/v0.1/manifest.schema.json",
+  "$id": "https://provenable.ai/schemas/aegx/v0.1/manifest.schema.json",
   "title": "AEGX Bundle Manifest v0.1",
   "description": "Manifest for an exported AEGX evidence bundle (.aegx.zip).",
   "type": "object",

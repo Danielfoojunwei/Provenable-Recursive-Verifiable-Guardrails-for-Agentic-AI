@@ -25,9 +25,9 @@ Every section is written as a machine-readable procedure with exact commands, ex
 | Capability | Tool | What It Proves |
 |------------|------|----------------|
 | Tamper-evident action log | `aegx` CLI | Every action has a content-derived hash; any change breaks the chain |
-| Control-plane protection | `openclaw-aer` | Untrusted inputs cannot change skills, tools, permissions, or config |
-| Memory protection | `openclaw-aer` | Tainted writes to persistent files are blocked |
-| Rollback | `openclaw-aer` | Exact-hash restoration to any previous snapshot |
+| Control-plane protection | `proven-aer` | Untrusted inputs cannot change skills, tools, permissions, or config |
+| Memory protection | `proven-aer` | Tainted writes to persistent files are blocked |
+| Rollback | `proven-aer` | Exact-hash restoration to any previous snapshot |
 | Portable evidence | `.aegx.zip` | Self-contained bundle anyone can verify offline |
 
 ---
@@ -59,9 +59,9 @@ export PATH="$INSTALL_DIR/target/release:$PATH"
 
 # Step 4: Verify
 aegx --help > /dev/null 2>&1 || { echo "FAIL: aegx not on PATH"; exit 1; }
-openclaw-aer --help > /dev/null 2>&1 || { echo "FAIL: openclaw-aer not on PATH"; exit 1; }
+proven-aer --help > /dev/null 2>&1 || { echo "FAIL: proven-aer not on PATH"; exit 1; }
 
-echo "AEGX installed. aegx and openclaw-aer are on PATH."
+echo "AEGX installed. aegx and proven-aer are on PATH."
 ```
 
 ### Decision: Do You Need AER?
@@ -69,7 +69,7 @@ echo "AEGX installed. aegx and openclaw-aer are on PATH."
 | Situation | Use |
 |-----------|-----|
 | You only need a tamper-evident log of actions | `aegx` CLI only (Pattern A) |
-| You need runtime guards + snapshots + rollback | `aegx` + `openclaw-aer` (Pattern B) |
+| You need runtime guards + snapshots + rollback | `aegx` + `proven-aer` (Pattern B) |
 
 ---
 
@@ -182,34 +182,34 @@ aegx summarize "$BUNDLE"
 
 ## 5. Pattern B: AER Runtime with Guards
 
-Use this when your agent runs inside an OpenClaw environment and you want CPI/MI protection, snapshots, and rollback.
+Use this when your agent runs inside an OpenClaw-compatible environment or any agentic system supporting Provenable.ai and you want CPI/MI protection, snapshots, and rollback.
 
 ### Step-by-step
 
 ```bash
 # 1. Initialize AER (once per environment)
-openclaw-aer init
+proven-aer init
 
 # 2. Check status
-openclaw-aer status
+proven-aer status
 
 # 3. Take a snapshot before risky operations
-openclaw-aer snapshot create "pre-deploy" --scope full
-SNAP_ID=$(openclaw-aer snapshot list | tail -1 | awk '{print $1}')
+proven-aer snapshot create "pre-deploy" --scope full
+SNAP_ID=$(proven-aer snapshot list | tail -1 | awk '{print $1}')
 
 # 4. Run your agent's operations
 #    AER automatically records events and enforces CPI/MI guards.
 #    If a guard denies an operation, your agent receives an error.
 
 # 5. If something goes wrong, rollback
-openclaw-aer rollback "$SNAP_ID"
+proven-aer rollback "$SNAP_ID"
 
 # 6. Export evidence for audit
-openclaw-aer bundle export --agent "$AGENT_ID"
+proven-aer bundle export --agent "$AGENT_ID"
 
 # 7. Verify the exported bundle
-BUNDLE_PATH=$(ls -t ~/.openclaw/.aer/bundles/*.aegx.zip | head -1)
-openclaw-aer verify "$BUNDLE_PATH"
+BUNDLE_PATH=$(ls -t ~/.proven/.aer/bundles/*.aegx.zip | head -1)
+proven-aer verify "$BUNDLE_PATH"
 ```
 
 ### Guard Decisions Your Agent Will Encounter
@@ -249,7 +249,7 @@ aegx import "$ZIP" /tmp/verify_target
 aegx verify /tmp/verify_target
 
 # For AER bundles
-openclaw-aer verify "$BUNDLE_PATH"
+proven-aer verify "$BUNDLE_PATH"
 ```
 
 ### Interpreting Exit Codes
@@ -284,10 +284,10 @@ esac
 
 ```bash
 # List available snapshots
-openclaw-aer snapshot list
+proven-aer snapshot list
 
 # Pick one and rollback
-openclaw-aer rollback <SNAPSHOT_ID>
+proven-aer rollback <SNAPSHOT_ID>
 
 # Verify rollback succeeded (command prints PASS/FAIL)
 ```
@@ -337,8 +337,8 @@ The last line is always `Verification: PASS` or `Verification: FAIL`.
 Use this checklist to confirm your agent integration is complete.
 
 - [ ] `aegx` binary is on PATH and `aegx --help` succeeds
-- [ ] `openclaw-aer` binary is on PATH (if using AER)
-- [ ] `openclaw-aer init` has been run (if using AER)
+- [ ] `proven-aer` binary is on PATH (if using AER)
+- [ ] `proven-aer init` has been run (if using AER)
 - [ ] Every session starts with `aegx init` (Pattern A) or is managed by AER (Pattern B)
 - [ ] Every agent action creates a record with correct type and principal
 - [ ] Every record (except root) has `--parents` set

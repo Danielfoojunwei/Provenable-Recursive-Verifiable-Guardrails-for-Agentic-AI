@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://openclaw.dev/schemas/aegx/v0.1/record.schema.json",
+  "$id": "https://provenable.ai/schemas/aegx/v0.1/record.schema.json",
   "title": "AEGX Typed Record v0.1",
   "description": "A single evidence record in the AEGX format used by AER.",
   "type": "object",

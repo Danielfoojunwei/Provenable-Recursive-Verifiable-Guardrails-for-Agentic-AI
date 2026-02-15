@@ -1,10 +1,10 @@
-name: Pin OpenClaw Version
+name: Pin Proven Version
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'OpenClaw version to pin (X.Y.Z)'
+        description: 'Proven version to pin (X.Y.Z)'
         required: true
         type: string
       set_default:
@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   pin-version:
-    name: Pin OpenClaw v${{ github.event.inputs.version }}
+    name: Pin Proven v${{ github.event.inputs.version }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,10 +61,10 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: pin openclaw v${{ github.event.inputs.version }}"
-          title: "Pin OpenClaw v${{ github.event.inputs.version }}"
+          commit-message: "chore: pin proven v${{ github.event.inputs.version }}"
+          title: "Pin Proven v${{ github.event.inputs.version }}"
           body: |
-            Automated version pin for OpenClaw `${{ github.event.inputs.version }}`.
+            Automated version pin for Proven `${{ github.event.inputs.version }}`.
 
             **Set as default:** ${{ github.event.inputs.set_default }}
 
@@ -73,7 +73,7 @@ jobs:
             - [ ] Manifest validation passes
             - [ ] Checksums regenerated
             - [ ] Smoke tests pass
-          branch: "pin/openclaw-${{ github.event.inputs.version }}"
+          branch: "pin/proven-${{ github.event.inputs.version }}"
           base: main
           labels: |
             version-pin

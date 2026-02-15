@@ -2,12 +2,12 @@
 
 ## Overview
 
-The OpenClaw AER installer uses a tag-based release process with automated CI validation. All tooling is written in Rust.
+The Provenable.ai AER installer uses a tag-based release process with automated CI validation. All tooling is written in Rust.
 
 ## Version Scheme
 
 - **Installer version**: `X.Y.Z` (semver) — tracks the installer scripts themselves
-- **OpenClaw version**: `X.Y.Z` (semver) — tracks the pinned OpenClaw npm package
+- **Proven version**: `X.Y.Z` (semver) — tracks the pinned Proven npm package
 - **Release tags**: `installer-vX.Y.Z` — triggers the release workflow
 
 ## Releasing a New Installer Version
@@ -18,8 +18,8 @@ Update the version in the following files:
 
 ```
 installer/manifest/manifest.json  → installer.version
-installer/install/install-openclaw-aer.sh  → INSTALLER_VERSION
-installer/install/install-openclaw-aer.ps1  → $InstallerVersion
+installer/install/install-proven-aer.sh  → INSTALLER_VERSION
+installer/install/install-proven-aer.ps1  → $InstallerVersion
 ```
 
 ### 2. Build the Rust tools (if not already built)
@@ -52,7 +52,7 @@ cargo test --manifest-path tools/Cargo.toml -- --test-threads=1
 ### 6. Run Smoke Tests
 
 ```bash
-chmod +x install/install-openclaw-aer.sh scripts/smoke_install_unix.sh
+chmod +x install/install-proven-aer.sh scripts/smoke_install_unix.sh
 bash scripts/smoke_install_unix.sh
 ```
 
@@ -75,11 +75,11 @@ The `release.yml` workflow triggers on `installer-v*` tags and:
 4. Runs smoke tests on Ubuntu and macOS
 5. Creates a GitHub Release with the installer artifacts
 
-## Pinning a New OpenClaw Version
+## Pinning a New Proven Version
 
 ### Via GitHub Actions (Recommended)
 
-1. Go to **Actions** > **Pin OpenClaw Version**
+1. Go to **Actions** > **Pin Proven Version**
 2. Click **Run workflow**
 3. Enter the version (e.g., `1.2.3`)
 4. Optionally check "Set as default version"
@@ -98,12 +98,13 @@ tools/target/debug/installer-tools pin-version --version 1.2.3 --set-default
 
 # Skip npm check (for testing only)
 tools/target/debug/installer-tools pin-version --version 1.2.3 --skip-npm-check
+
 ```
 
 ### What `pin-version` Does
 
 1. Validates version format (semver)
-2. Verifies version exists on npm (`npm view openclaw@X.Y.Z`)
+2. Verifies version exists on npm (`npm view proven@X.Y.Z`)
 3. Fetches `engines.node` requirement from npm
 4. Adds version to `manifest.json` pinned_versions
 5. Optionally sets it as default_version
