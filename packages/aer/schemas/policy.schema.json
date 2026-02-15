@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/aegx/v0.1/policy.schema.json",
+  "title": "AER Policy Pack v0.1",
+  "description": "Policy pack controlling CPI/MI guard enforcement in AER.",
+  "type": "object",
+  "required": ["version", "name", "rules"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Policy pack format version"
+    },
+    "name": {
+      "type": "string",
+      "description": "Policy pack name"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "surface", "action", "condition", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique rule identifier"
+          },
+          "surface": {
+            "type": "string",
+            "enum": ["ControlPlane", "DurableMemory"],
+            "description": "The surface this rule applies to"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["Allow", "Deny"],
+            "description": "Action to take when rule matches"
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "principals": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["Sys", "User", "ToolAuth", "ToolUnauth", "Web", "Skill", "Channel", "External"]
+                },
+                "description": "Principal(s) this rule applies to"
+              },
+              "taint_any": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Taint bitset — rule matches if request taint intersects these flags"
+              },
+              "require_approval": {
+                "type": "boolean",
+                "description": "If true, rule only matches when explicit approval flag is set"
+              }
+            }
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the rule"
+          }
+        }
+      }
+    }
+  }
+}

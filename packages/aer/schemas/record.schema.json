@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/aegx/v0.1/record.schema.json",
+  "title": "AEGX Typed Record v0.1",
+  "description": "A single evidence record in the AEGX format used by AER.",
+  "type": "object",
+  "required": ["record_id", "record_type", "principal", "taint", "parents", "meta", "payload"],
+  "properties": {
+    "record_id": {
+      "type": "string",
+      "description": "SHA-256 hash of canonical(payload) || canonical(meta)",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "record_type": {
+      "type": "string",
+      "enum": [
+        "SessionStart", "SessionMessage", "ToolCall", "ToolResult",
+        "FileRead", "FileWrite", "FileDelete", "FileRename",
+        "ControlPlaneChangeRequest", "MemoryCommitRequest",
+        "GuardDecision", "Snapshot", "Rollback"
+      ]
+    },
+    "principal": {
+      "type": "string",
+      "enum": ["SYS", "USER", "TOOL_AUTH", "TOOL_UNAUTH", "WEB", "SKILL", "CHANNEL", "EXTERNAL"],
+      "description": "Principal identity from the trust lattice: WEB,SKILL <= TOOL_UNAUTH <= TOOL_AUTH <= USER <= SYS"
+    },
+    "taint": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Taint bitset: UNTRUSTED=1, INJECTION_SUSPECT=2, PROXY_DERIVED=4, SECRET_RISK=8, CROSS_SESSION=16, TOOL_OUTPUT=32, SKILL_OUTPUT=64, WEB_DERIVED=128"
+    },
+    "parents": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "description": "Provenance edges: record IDs of parent records"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["ts"],
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "agent_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "tool_id": { "type": "string" },
+        "path": { "type": "string" },
+        "channel": { "type": "string" },
+        "ip": { "type": "string" },
+        "config_key": { "type": "string" },
+        "rule_id": { "type": "string" },
+        "snapshot_id": { "type": "string" }
+      }
+    },
+    "payload": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "data"],
+          "properties": {
+            "kind": { "const": "inline" },
+            "data": {}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "hash", "size"],
+          "properties": {
+            "kind": { "const": "blob" },
+            "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "size": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    }
+  }
+}

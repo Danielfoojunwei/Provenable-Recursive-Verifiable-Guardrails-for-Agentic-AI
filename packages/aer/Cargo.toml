@@ -1,0 +1,33 @@
+[package]
+name = "aer"
+version = "0.1.0"
+edition = "2021"
+description = "Agent Evidence & Recovery (AER) — AEGX Recorder, CPI/MI Guard, RVU Rollback"
+license = "MIT"
+
+[[bin]]
+name = "openclaw-aer"
+path = "src/main.rs"
+
+[lib]
+name = "aer"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+thiserror = "2"
+bitflags = "2"
+walkdir = "2"
+tempfile = "3"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
