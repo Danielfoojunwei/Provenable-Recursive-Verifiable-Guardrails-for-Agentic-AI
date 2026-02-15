@@ -1,5 +1,7 @@
 /target
 /packages/aer/target
+/installer/tools/target
 *.swp
 *.swo
 .DS_Store
+*.proptest-regressions

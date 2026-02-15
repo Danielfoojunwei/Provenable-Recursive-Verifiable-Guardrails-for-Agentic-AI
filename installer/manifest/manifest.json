@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1",
+  "installer": {
+    "version": "0.1.0",
+    "artifacts": {
+      "install-openclaw-aer.sh": {
+        "sha256": "80ffd089b105b5a46f4f4e0aa94741682d3f7b4838a96c7cbbb8c6a85246f4eb"
+      },
+      "install-openclaw-aer.ps1": {
+        "sha256": "9e1740080b2802d32a3fdb5c5477d9729e684e7d4757ae226faeaf9c1cbea6c4"
+      }
+    }
+  },
+  "openclaw": {
+    "install_mode": "npm",
+    "pinned_versions": [
+      {
+        "version": "0.1.0",
+        "engines_node_min": ">=22.0.0",
+        "notes": "Initial pinned version — known good baseline",
+        "allowed": true
+      }
+    ],
+    "default_version": "0.1.0"
+  }
+}
