@@ -181,6 +181,50 @@ pub fn default_policy() -> PolicyPack {
                 },
                 description: "Allow memory writes from USER or SYS principals".to_string(),
             },
+            // CIO: deny messages with injection-suspected taint
+            PolicyRule {
+                id: "cio-deny-injection".to_string(),
+                surface: GuardSurface::ConversationIO,
+                action: GuardVerdict::Deny,
+                condition: PolicyCondition {
+                    principals: None,
+                    taint_any: Some(TaintFlags::INJECTION_SUSPECT),
+                    require_approval: None,
+                },
+                description: "Deny conversation messages with injection-suspected taint"
+                    .to_string(),
+            },
+            // CIO: deny untrusted principals' messages with any taint
+            PolicyRule {
+                id: "cio-deny-untrusted-tainted".to_string(),
+                surface: GuardSurface::ConversationIO,
+                action: GuardVerdict::Deny,
+                condition: PolicyCondition {
+                    principals: Some(vec![
+                        Principal::Web,
+                        Principal::Skill,
+                        Principal::Channel,
+                        Principal::External,
+                    ]),
+                    taint_any: Some(TaintFlags::UNTRUSTED),
+                    require_approval: None,
+                },
+                description:
+                    "Deny conversation messages from untrusted principals with taint"
+                        .to_string(),
+            },
+            // CIO: allow clean messages
+            PolicyRule {
+                id: "cio-allow-clean".to_string(),
+                surface: GuardSurface::ConversationIO,
+                action: GuardVerdict::Allow,
+                condition: PolicyCondition {
+                    principals: None,
+                    taint_any: None,
+                    require_approval: None,
+                },
+                description: "Allow clean conversation messages".to_string(),
+            },
         ],
     }
 }

@@ -62,6 +62,14 @@ pub struct ProveResponse {
     /// System health (if requested).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub health: Option<SystemHealth>,
+    /// Rollback status — active recommendations or auto-rollback history.
+    /// The agent MUST relay these messages to the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollback_status: Option<RollbackStatus>,
+    /// Pending agent notifications — messages the agent MUST relay to the user.
+    /// These are drained on read; subsequent queries will not include them.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub agent_notifications: Vec<crate::agent_notifications::AgentNotification>,
 }
 
 /// Summary of what Provenable.ai has protected.
@@ -73,10 +81,20 @@ pub struct ProtectionSummary {
     pub cpi_violations_blocked: u64,
     /// Total MI violations blocked.
     pub mi_violations_blocked: u64,
+    /// Total conversation I/O threats blocked (injection + leakage).
+    pub conversation_threats_blocked: u64,
     /// Total taint-based blocks.
     pub taint_blocks: u64,
     /// Total proxy misconfigurations detected.
     pub proxy_misconfigs_detected: u64,
+    /// Total auto-rollbacks executed.
+    pub auto_rollbacks: u64,
+    /// Total rollback recommendations issued.
+    pub rollback_recommendations: u64,
+    /// Total contamination events detected.
+    pub contamination_events: u64,
+    /// Total skill verifications performed.
+    pub skills_verified: u64,
     /// Critical alerts count.
     pub critical_alerts: u64,
     /// High alerts count.
@@ -112,6 +130,21 @@ pub struct SystemHealth {
     pub warnings: Vec<String>,
 }
 
+/// Rollback status information for the agent to relay to the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RollbackStatus {
+    /// Number of auto-rollbacks that have occurred.
+    pub auto_rollbacks_performed: u64,
+    /// Number of rollback recommendations issued.
+    pub rollback_recommendations: u64,
+    /// Number of contamination scopes detected.
+    pub contamination_events: u64,
+    /// Current denial count in the active window.
+    pub active_denial_count: u64,
+    /// Human-readable messages the agent MUST tell the user.
+    pub agent_messages: Vec<String>,
+}
+
 /// Execute a `/prove` query and return the response.
 pub fn execute_query(query: &ProveQuery) -> io::Result<ProveResponse> {
     let all_alerts = alerts::read_filtered_alerts(
@@ -142,13 +175,20 @@ pub fn execute_query(query: &ProveQuery) -> io::Result<ProveResponse> {
         None
     };
 
+    let rollback_status = compute_rollback_status(&alerts_result);
+
+    // Drain pending agent notifications
+    let agent_notifications = crate::agent_notifications::drain_notifications();
+
     Ok(ProveResponse {
-        version: "0.1.0".to_string(),
+        version: "0.1.5".to_string(),
         generated_at: Utc::now(),
         protection,
         alerts: alerts_result,
         metrics: metrics_data,
         health,
+        rollback_status,
+        agent_notifications,
     })
 }
 
@@ -161,6 +201,10 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
     let mut mi_blocked = 0u64;
     let mut taint_blocks = 0u64;
     let mut proxy_misconfigs = 0u64;
+    let mut conversation_blocked = 0u64;
+    let mut auto_rollbacks = 0u64;
+    let mut rollback_recs = 0u64;
+    let mut contamination_events = 0u64;
     let mut critical = 0u64;
     let mut high = 0u64;
     let mut medium = 0u64;
@@ -185,6 +229,14 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
             }
             ThreatCategory::TaintBlock => taint_blocks += 1,
             ThreatCategory::ProxyMisconfig => proxy_misconfigs += 1,
+            ThreatCategory::PromptExtraction | ThreatCategory::PromptLeakage => {
+                if alert.blocked {
+                    conversation_blocked += 1;
+                }
+            }
+            ThreatCategory::AutoRollback => auto_rollbacks += 1,
+            ThreatCategory::RollbackRecommended => rollback_recs += 1,
+            ThreatCategory::ContaminationDetected => contamination_events += 1,
             _ => {}
         }
 
@@ -216,12 +268,28 @@ fn compute_protection_summary() -> io::Result<ProtectionSummary> {
         0.0
     };
 
+    // Count skill verifications from records
+    let skills_verified = all_records
+        .iter()
+        .filter(|r| {
+            if r.record_type != RecordType::GuardDecision {
+                return false;
+            }
+            r.meta.config_key.as_deref() == Some("skills.install")
+        })
+        .count() as u64;
+
     Ok(ProtectionSummary {
         total_threats_blocked: total_blocked,
         cpi_violations_blocked: cpi_blocked,
         mi_violations_blocked: mi_blocked,
+        conversation_threats_blocked: conversation_blocked,
         taint_blocks,
         proxy_misconfigs_detected: proxy_misconfigs,
+        auto_rollbacks,
+        rollback_recommendations: rollback_recs,
+        contamination_events,
+        skills_verified,
         critical_alerts: critical,
         high_alerts: high,
         medium_alerts: medium,
@@ -287,6 +355,49 @@ fn compute_health() -> io::Result<SystemHealth> {
     })
 }
 
+/// Compute rollback status from alerts.
+fn compute_rollback_status(alerts: &[ThreatAlert]) -> Option<RollbackStatus> {
+    let auto_rollbacks = alerts
+        .iter()
+        .filter(|a| a.category == ThreatCategory::AutoRollback)
+        .count() as u64;
+    let recommendations = alerts
+        .iter()
+        .filter(|a| a.category == ThreatCategory::RollbackRecommended)
+        .count() as u64;
+    let contamination = alerts
+        .iter()
+        .filter(|a| a.category == ThreatCategory::ContaminationDetected)
+        .count() as u64;
+
+    let active_denials = crate::rollback_policy::current_denial_count();
+
+    // Collect agent messages from recent rollback/contamination alerts
+    let mut messages = Vec::new();
+    for alert in alerts.iter().rev().take(10) {
+        match alert.category {
+            ThreatCategory::AutoRollback
+            | ThreatCategory::RollbackRecommended
+            | ThreatCategory::ContaminationDetected => {
+                messages.push(alert.summary.clone());
+            }
+            _ => {}
+        }
+    }
+
+    if auto_rollbacks == 0 && recommendations == 0 && contamination == 0 && active_denials == 0 {
+        return None;
+    }
+
+    Some(RollbackStatus {
+        auto_rollbacks_performed: auto_rollbacks,
+        rollback_recommendations: recommendations,
+        contamination_events: contamination,
+        active_denial_count: active_denials,
+        agent_messages: messages,
+    })
+}
+
 /// Format a ProveResponse as a human-readable string for CLI output.
 pub fn format_prove_response(response: &ProveResponse) -> String {
     let mut out = String::new();
@@ -301,8 +412,13 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     out.push_str(&format!("  Threats Blocked:         {}\n", p.total_threats_blocked));
     out.push_str(&format!("  CPI Violations Blocked:  {}\n", p.cpi_violations_blocked));
     out.push_str(&format!("  MI Violations Blocked:   {}\n", p.mi_violations_blocked));
+    out.push_str(&format!("  Conversation Blocked:    {}\n", p.conversation_threats_blocked));
     out.push_str(&format!("  Taint Blocks:            {}\n", p.taint_blocks));
     out.push_str(&format!("  Proxy Misconfigs:        {}\n", p.proxy_misconfigs_detected));
+    out.push_str(&format!("  Auto-Rollbacks:          {}\n", p.auto_rollbacks));
+    out.push_str(&format!("  Rollback Recs:           {}\n", p.rollback_recommendations));
+    out.push_str(&format!("  Contamination Events:    {}\n", p.contamination_events));
+    out.push_str(&format!("  Skills Verified:         {}\n", p.skills_verified));
     out.push_str(&format!(
         "  Protection Rate:         {:.1}%\n",
         p.protection_rate * 100.0
@@ -352,6 +468,22 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
         }
     }
 
+    // Rollback Status
+    if let Some(rs) = &response.rollback_status {
+        out.push_str("\n── Rollback & Recovery ─────────────────────────────────────────\n\n");
+        out.push_str(&format!("  Auto-Rollbacks:          {}\n", rs.auto_rollbacks_performed));
+        out.push_str(&format!("  Recommendations:         {}\n", rs.rollback_recommendations));
+        out.push_str(&format!("  Contamination Events:    {}\n", rs.contamination_events));
+        out.push_str(&format!("  Active Denial Count:     {}\n", rs.active_denial_count));
+
+        if !rs.agent_messages.is_empty() {
+            out.push_str("\n  ACTION REQUIRED:\n");
+            for msg in &rs.agent_messages {
+                out.push_str(&format!("    >> {}\n", msg));
+            }
+        }
+    }
+
     // Recent Alerts
     if !response.alerts.is_empty() {
         out.push_str("\n── Recent Alerts ──────────────────────────────────────────────\n\n");
@@ -373,6 +505,29 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     } else {
         out.push_str("\n── Recent Alerts ──────────────────────────────────────────────\n\n");
         out.push_str("  No alerts in the selected time range.\n");
+    }
+
+    // Agent Notifications
+    if !response.agent_notifications.is_empty() {
+        out.push_str("\n── Agent Notifications ─────────────────────────────────────────\n\n");
+        for n in &response.agent_notifications {
+            let icon = match n.level {
+                crate::agent_notifications::NotificationLevel::Critical => "[!!]",
+                crate::agent_notifications::NotificationLevel::Error => "[! ]",
+                crate::agent_notifications::NotificationLevel::Warning => "[. ]",
+                crate::agent_notifications::NotificationLevel::Info => "[  ]",
+            };
+            out.push_str(&format!(
+                "  {} [{}] {} — {}\n",
+                icon,
+                n.source,
+                n.level,
+                n.message,
+            ));
+            if let Some(action) = &n.suggested_action {
+                out.push_str(&format!("       Action: {}\n", action));
+            }
+        }
     }
 
     out.push_str("\n───────────────────────────────────────────────────────────────\n");

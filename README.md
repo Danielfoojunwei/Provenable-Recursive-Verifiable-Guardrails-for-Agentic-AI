@@ -8,49 +8,64 @@ changes.
 
 ---
 
-## The Problem
+## The Problem — Empirical Evidence
 
 Agentic AI systems operate with increasing autonomy — calling tools, modifying
 files, installing skills, and making decisions on behalf of users. This creates
-a fundamental security gap that existing approaches fail to address:
+a fundamental security gap that existing approaches fail to address. The
+evidence is not theoretical:
 
-### 1. Unverifiable Agent Behavior
+### Real-World Evidence: ClawHavoc (February 2026)
 
-Current AI agent frameworks provide **no cryptographic proof** of what an agent
-did, in what order, or under whose authority. If an agent corrupts data or
-performs unauthorized actions, there is no tamper-evident record to determine
-what happened. Post-incident forensics are impossible when the agent itself
-could have altered its own logs.
+Security researchers discovered **341 malicious skills** on ClawHub — the
+official skill marketplace for OpenClaw ("npm for AI agents", 3,286+ skills,
+1.5M+ downloads). Of these, **335 came from a single coordinated campaign**.
 
-### 2. Unguarded Control Planes
+> *"The attacks ranged from sophisticated social engineering to brute-force
+> credential theft. Malicious SKILL.md files instructed users to run
+> `curl | bash` installers that delivered the Atomic macOS Stealer (AMOS).
+> Others silently exfiltrated `.clawdbot/.env` files containing API keys and
+> tokens, or poisoned SOUL.md and MEMORY.md to permanently alter agent
+> behavior."*
+> — [eSecurity Planet, Feb 2026](https://www.esecurityplanet.com/threats/hundreds-of-malicious-skills-found-in-openclaws-clawhub/)
 
-Most agent systems allow any input — including untrusted web content, tool
-outputs, and skill responses — to modify the control plane (permissions, tool
-registrations, skill configurations). A single prompt injection or malicious
-tool output can escalate privileges, install backdoor skills, or disable
-security policies without any structural enforcement preventing it.
+The six attack vectors discovered:
 
-### 3. Corrupted Persistent Memory
+| # | Attack | Impact | What Was Missing |
+|---|--------|--------|-----------------|
+| V1 | SKILL.md instructs user to run `curl \| bash` | Arbitrary code execution | No pre-install scanning |
+| V2 | Skill code spawns reverse shell to attacker C2 | Persistent remote access | No sandboxing, no audit trail |
+| V3 | Skill reads `.clawdbot/.env` and exfiltrates API keys | Secret theft | No file-read guards |
+| V4 | Skill writes to `SOUL.md` / `MEMORY.md` | Permanent behavioral corruption | **No write guards on agent memory** |
+| V5 | Trojan skill shadows legitimate bundled skill | Invisible capability hijack | No name-collision detection |
+| V6 | `web-serach` mimics `web-search` | Users install wrong skill | No similarity detection |
 
-Agents that persist state across sessions (identity files, user preferences,
-agent personality, tool registrations) are vulnerable to **memory poisoning**.
-Tainted data from untrusted sources can be written into durable memory,
-permanently corrupting the agent's behavior in all future sessions. No existing
-system enforces write guards based on data provenance.
+### Real-World Evidence: ZeroLeaks Assessment
 
-### 4. No Provenance Tracking
+The ZeroLeaks OpenClaw Security Assessment tested 36 attack vectors against
+the unprotected system and found:
 
-When an agent produces an output, there is no way to trace the chain of data
-dependencies that influenced it. If a tool output was derived from an untrusted
-web source, downstream decisions based on that output inherit the taint — but
-nothing tracks or enforces this. Confused-deputy attacks are trivial.
+- **84.6% extraction success** — 11 of 13 system prompt extraction attacks succeeded
+- **91.3% injection success** — 21 of 23 prompt injection attacks succeeded
+- **ZLSS: 10/10** (worst possible score)
+- **Security Score: 2/100**
 
-### 5. Irreversible Contamination
+> *"Every single extraction technique — JSON conversion, many-shot priming,
+> crescendo deepening, roleplay, identity probing, chain-of-thought hijacking
+> — succeeded in extracting significant portions of the system prompt."*
 
-When contamination is detected, there is no systematic way to identify all
-affected records, compute the contamination closure, and roll back to a
-verified-clean state. Operators resort to manual inspection or full system
-rebuilds.
+### The Five Structural Gaps
+
+1. **Unverifiable Agent Behavior** — No cryptographic proof of what an agent
+   did, in what order, or under whose authority.
+2. **Unguarded Control Planes** — Any input can modify permissions, tool
+   registrations, and skill configurations. ClawHavoc exploited this directly.
+3. **Corrupted Persistent Memory** — No write guards based on data provenance.
+   ClawHavoc V4 poisoned SOUL.md to permanently corrupt agent behavior.
+4. **No Provenance Tracking** — No taint propagation. Confused-deputy attacks
+   are trivial.
+5. **Irreversible Contamination** — No systematic way to identify affected
+   records, compute closure, and roll back.
 
 ---
 
@@ -111,7 +126,43 @@ the provenance DAG identifies all downstream records that must be invalidated.
 file matches its snapshot hash exactly. The rollback itself is recorded as
 audit evidence.
 
-### Outcome 5: Self-Contained Portable Evidence
+### Outcome 5: Supply-Chain Defense (ClawHavoc Prevention)
+
+A **pre-install skill verifier** scans skill packages before they enter the
+runtime, detecting all six ClawHavoc attack vectors. The `hooks::on_skill_install()`
+chokepoint ensures no skill is installed without verification, and every
+verification result is recorded as tamper-evident evidence.
+
+**Concrete guarantee:** `skill_verifier::verify_skill_package()` scans SKILL.md
+through the full 8-category input scanner plus 6 ClawHavoc-specific pattern
+detectors. Critical/High findings block installation; Medium findings require
+explicit user approval. 16 tests validate detection of all attack vectors with
+zero false positives on legitimate skills.
+
+### Outcome 6: Automated Recovery & Agent Notification (v0.1.4)
+
+Three automated rollback mechanisms ensure the system can detect, recommend,
+and execute recovery without manual intervention:
+
+1. **Auto-Snapshot Before CPI Changes** — Every allowed control-plane mutation
+   (skill install, permission change, etc.) creates a pre-change snapshot
+   automatically, ensuring rollback is always possible.
+2. **Rollback Recommendation** — When 3+ guard denials occur within 2 minutes,
+   the system emits a `RollbackRecommended` alert with the snapshot target and
+   CLI command. The agent relays this to the user.
+3. **Threshold-Based Auto-Rollback** — When 5+ denials occur within 2 minutes,
+   the system automatically rolls back to the most recent snapshot, emits a
+   `CRITICAL` alert, and the agent immediately notifies the user.
+
+Additionally, **RVU contamination scope computation** traces the provenance
+DAG from any contaminated record to find all downstream records that may be
+affected, enabling targeted review or rollback.
+
+**Concrete guarantee:** The `/prove` endpoint includes `rollback_status` with
+`agent_messages` that the agent MUST relay to the user. Every auto-rollback
+and contamination event is recorded as tamper-evident evidence.
+
+### Outcome 7: Self-Contained Portable Evidence
 
 Bundles are self-contained directories (or `.aegx.zip` archives) containing
 everything needed for independent, offline verification. No network access, no
@@ -128,6 +179,174 @@ AER implements the structural guarantees from four published formal theorems:
 - [Control-Plane Integrity Theorem](https://github.com/Danielfoojunwei/Control-plane-integrity-theorem-) — Under provenance completeness, principal accuracy, and memory persistence assumptions, no untrusted input alters the control plane.
 - [Memory Integrity Theorem](https://github.com/Danielfoojunwei/Memory-integrity-theorem) — Guarantees immutability, taint blocking, and session isolation for persistent memory.
 - [RVU Machine Unlearning](https://github.com/Danielfoojunwei/RVU-Machine-Unlearning) — Provenance DAG with contamination detection, closure computation, and verifiable recovery certificates.
+
+### Theorem → Defense Integration Map
+
+Every scanner detection category and guard surface is grounded in a specific
+theorem. The table below shows the exact mapping:
+
+| Scanner Category       | Primary Theorem       | What It Prevents                                    |
+|------------------------|-----------------------|-----------------------------------------------------|
+| `SystemImpersonation`  | CPI Theorem (A2)      | Fake `[SYSTEM]`/`[ADMIN]` tags override transport-assigned principal |
+| `IndirectInjection`    | Noninterference       | Hidden AI directives in documents cross trust boundaries |
+| `BehaviorManipulation` | CPI Theorem           | Persona/instruction overrides mutate control-plane behavioral state |
+| `FalseContextInjection`| MI + Noninterference  | Fabricated prior context poisons working memory (violates A1) |
+| `EncodedPayload`       | Noninterference       | Encoded payloads evade taint detection, bypassing isolation |
+| `ExtractionAttempt`    | MI (read-side)        | System prompt is protected memory; disclosure violates confidentiality |
+| `ManyShotPriming`      | Noninterference       | Accumulated untrusted examples override model behavior |
+| `FormatOverride`       | Noninterference       | Format locks enable exfiltration or bypass downstream defenses |
+
+| Guard Surface      | Theorem(s)            | Enforcement Point                     |
+|--------------------|-----------------------|---------------------------------------|
+| `ControlPlane`     | CPI Theorem           | `guard.check_control_plane()` — skill/tool/permission mutations |
+| `DurableMemory`    | MI Theorem            | `guard.check_memory_write()` — SOUL.md, AGENTS.md, etc. |
+| `ConversationIO`   | All four theorems     | `guard.check_conversation_input()` + `check_conversation_output()` |
+
+| Output Guard Layer          | Theorem                       | What It Catches                       |
+|-----------------------------|-------------------------------|---------------------------------------|
+| Token watchlist (static)    | MI (read-side)                | Internal tokens (SILENT_REPLY_TOKEN, HEARTBEAT_OK, etc.) |
+| Token watchlist (dynamic)   | MI Dynamic Discovery Corollary| Runtime-discovered SCREAMING_CASE, camelCase, `${params.*}` |
+| Structural patterns         | MI + CPI                      | Prompt structure disclosure (skill loading, reply tags, identity) |
+| Section heuristic           | MI                            | Multi-section prompt dumps (4+ section headers) |
+
+| Session-Level Defense           | Theorem Corollary               | What It Prevents                       |
+|---------------------------------|---------------------------------|----------------------------------------|
+| Conversation state tracker      | Conversational Noninterference  | Crescendo/multi-turn extraction across message sequences |
+| Canary injection escalation     | CPI Behavioral Constraint       | Forced-phrase injection denied for ALL principals |
+| Semantic intent detection       | Semantic Intent (Noninterference) | Novel extraction phrasings (verb + target regex matching) |
+
+| Supply-Chain Defense             | Theorem(s)                      | What It Prevents (ClawHavoc)            |
+|----------------------------------|---------------------------------|-----------------------------------------|
+| Pre-install skill verifier       | CPI + Noninterference           | Shell commands, reverse shells, credential theft, memory poisoning |
+| Name collision detection         | CPI                             | Skill precedence exploitation (V5)      |
+| Typosquatting detection          | CPI                             | Name similarity attacks (V6)            |
+| MI write guard at runtime        | MI Theorem                      | Memory poisoning blocked structurally — **V4 fully prevented** |
+
+| Automated Recovery (v0.1.4)        | Theorem(s)                      | What It Provides                        |
+|------------------------------------|---------------------------------|-----------------------------------------|
+| Auto-snapshot before CPI           | RVU Machine Unlearning          | Every CPI mutation has a rollback point |
+| Rollback recommendation (3+ denials) | RVU + All four theorems       | Agent alerts user with snapshot target and CLI command |
+| Auto-rollback (5+ denials)         | RVU Machine Unlearning          | Automatic recovery when attack burst detected |
+| Contamination scope computation    | RVU Machine Unlearning          | Transitive closure identifies all affected downstream records |
+| MI read-side taint tracking        | MI + Noninterference            | Untrusted readers get tainted provenance, preventing laundering |
+
+---
+
+## Empirical Validation: ZeroLeaks Benchmark
+
+We ran the exact ZeroLeaks attack taxonomy — 36 real attack payloads — against
+our ConversationIO guard using the actual scanner and output guard code.
+**No mocks, no simulations, no cherry-picking** (`packages/aer/tests/zeroleaks_benchmark.rs`).
+
+### Results (Worst-Case: USER Principal, Input Scanner Only)
+
+| Metric                     | Before (No Guards) | v0.1.1 | v0.1.2 | v0.1.3 | v0.1.4 (Current) |
+|----------------------------|--------------------|--------|--------|--------|-------------------|
+| Extraction Success Rate    | 84.6% (11/13)      | 38.5%  | **15.4%** | 15.4% | **15.4% (2/13)**  |
+| Injection Success Rate     | 91.3% (21/23)      | 4.3%   | **4.3%**  | 4.3%  | **4.3% (1/23)**   |
+| **ZLSS (1-10, lower=better)** | **10/10**       | 2/10   | **1/10**  | 1/10  | **1/10**          |
+| **Security Score (0-100)** | **2/100**           | 79/100 | **90/100**| 90/100| **90/100**        |
+| Supply-chain (ClawHavoc)   | 0/6 vectors blocked | —      | —         | **6/6** | 6/6 detected    |
+| Automated recovery         | None               | —      | —         | —     | **Auto-rollback + contamination scope** |
+| MI read-side taint         | None               | —      | —         | —     | **Reader principal tracked** |
+| Total tests                | —                  | 114    | 152       | 168   | **176 pass**      |
+
+### Layer-by-Layer Breakdown
+
+**Layer 1 — Input Scanner (with Semantic Intent + Session State):**
+
+| Attack Type | Blocked | Suspicious (Tainted) | Clean (Passed) |
+|-------------|---------|---------------------|----------------|
+| Extraction (13 attacks) | 4 | 7 | 2 |
+| Injection (23 attacks) | 13 | 9 | 1 |
+
+**Layer 2 — Output Guard (with Dynamic Token Discovery):**
+
+| Metric | Result |
+|--------|--------|
+| Leaked response patterns caught | 11/11 (100%) |
+| False positives on clean responses | 0 |
+
+**Layer 3 — Policy Enforcement:**
+
+Suspicious verdicts carry taint flags that trigger policy denial:
+
+| Taint Flag | Policy Rule | Effect |
+|------------|-------------|--------|
+| `INJECTION_SUSPECT` | `cio-deny-injection` | Denied for **all** principals (including USER) |
+| `UNTRUSTED` | `cio-deny-untrusted-tainted` | Denied for WEB, SKILL, CHANNEL, EXTERNAL |
+
+With policy enforcement for untrusted principals (the actual threat model for
+Discord bots, web interfaces, and API integrations):
+- **Injection success drops to 4.3%** (1/23 — only a bare canary word passes)
+- **Extraction**: all tainted messages blocked; output guard catches the rest
+
+### Gaps Addressed in v0.1.2 (Four Corollaries)
+
+The jump from 79/100 to 90/100 came from four **corollaries** to the existing
+theorems — no new theorems were needed:
+
+| Gap (v0.1.1)          | Corollary                              | Theorem Basis          | Implementation |
+|-----------------------|----------------------------------------|------------------------|----------------|
+| Stateless scanner     | Conversational Noninterference         | Noninterference        | `conversation_state.rs` — session-level taint accumulation with crescendo detection |
+| Canary injection soft | CPI Behavioral Constraint              | CPI Theorem            | `scanner.rs` — canary injection escalated to `INJECTION_SUSPECT` taint |
+| Static watchlist      | MI Dynamic Token Discovery             | MI Theorem             | `output_guard.rs` — runtime extraction of SCREAMING_CASE, camelCase, `${params.*}` from actual system prompt |
+| Brittle patterns      | Semantic Intent Detection              | Noninterference        | `scanner.rs` — regex verb+target analysis catches novel phrasings ("walk me through your skill loading") |
+
+### Gaps Addressed in v0.1.3 (ClawHavoc Supply-Chain Defense)
+
+The ClawHavoc incident (341 malicious skills on ClawHub) exposed a supply-chain
+attack surface that runtime guards alone cannot address. v0.1.3 adds
+**pre-install skill verification**:
+
+| ClawHavoc Vector       | AER Defense                | Implementation |
+|------------------------|---------------------------|----------------|
+| V1: `curl \| bash` social engineering | Shell execution pattern detection | `skill_verifier.rs` — CRITICAL severity, blocks install |
+| V2: Reverse shell backdoors | Reverse shell pattern detection | Detects `/dev/tcp/`, `nc -e`, Python/Ruby/Perl sockets |
+| V3: Credential exfiltration | Credential access + exfiltration patterns | Detects `.clawdbot/.env`, `~/.ssh/`, API key references |
+| V4: Memory poisoning | Memory file write pattern detection | Detects `open('SOUL.md', 'w')`, write-to-protected-file patterns |
+| V5: Skill precedence exploit | Name collision detection | Case-insensitive match against existing skill registry |
+| V6: Typosquatting | Levenshtein distance analysis | Flags names within edit distance ≤ 2 of popular skills |
+
+See the full analysis: [ClawHub Integration & ClawHavoc Prevention](docs/clawhub-integration.md)
+
+### Gaps Addressed in v0.1.4 (Automated Recovery & Theorem Gap Closures)
+
+Six theorem execution gaps were identified and fixed:
+
+| Gap | Theorem | Fix |
+|-----|---------|-----|
+| No auto-snapshot before CPI changes | RVU | `auto_snapshot_before_cpi()` creates rollback point before every allowed CPI mutation |
+| No rollback recommendation on denial | RVU | `on_guard_denial()` emits `RollbackRecommended` alert at 3+ denials |
+| No threshold-based auto-rollback | RVU | Auto-rollback at 5+ denials in 120s, `CRITICAL` alert emitted |
+| No contamination scope computation | RVU | `compute_contamination_scope()` BFS on provenance DAG |
+| MI reads had clean provenance | MI/Noninterference | `read_memory_file()` tracks reader principal and applies taint |
+| Agent not notified of rollback events | All four | `/prove` includes `rollback_status.agent_messages` |
+
+### Remaining Honest Gaps
+
+1. **No LLM-based semantic understanding** — Regex intent detection only. Novel
+   attack phrasings not matching verb+target patterns may bypass detection.
+2. **Benchmark tests individual messages** — Multi-turn session detection is
+   implemented in `guard.rs` but not exercised by the per-message benchmark.
+3. **Adversarial prompt evolution** — Static regex patterns may be outpaced by
+   adversarial prompt engineering research.
+4. **Output guard heuristic** — Section header detection may miss novel disclosure
+   formats not matching the known header list.
+5. **No LLM in the loop** — Benchmark measures scanner/guard detection rates, not
+   whether the LLM would comply with the attack. Actual success rates depend on
+   model behavior.
+6. **No file-read guards** — MI guards writes but not reads of sensitive files.
+   A skill with filesystem access can still read `.env` files.
+7. **No outbound network monitoring** — AER is a reference monitor, not a network
+   proxy. Skills can POST exfiltrated data to external servers.
+
+### How to Run the Benchmark
+
+```bash
+cd packages/aer
+cargo test zeroleaks_full_benchmark -- --nocapture
+```
 
 ---
 
@@ -438,6 +657,7 @@ fuzz/                 # Fuzz testing targets
 | [Agent Integration Guide](docs/AGENT_INTEGRATION.md) | Step-by-step integration for AI agents and pipelines |
 | [AER Usage Guide](docs/aer-usage.md) | AER runtime operations (guards, snapshots, rollback) |
 | [CPI/MI Guard Rules](docs/aer-cpi-mi-rules.md) | Trust lattice, taint model, policy customization |
+| [ClawHub Integration](docs/clawhub-integration.md) | ClawHub marketplace integration & ClawHavoc prevention |
 
 ### Technical Reference
 

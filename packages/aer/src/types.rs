@@ -190,10 +190,13 @@ pub struct GuardDecisionDetail {
 }
 
 /// The surface being guarded.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GuardSurface {
     ControlPlane,
     DurableMemory,
+    /// Conversation I/O surface — guards LLM inputs and outputs against
+    /// prompt injection, system prompt extraction, and behavioral manipulation.
+    ConversationIO,
 }
 
 /// Snapshot manifest entry for a single file.
