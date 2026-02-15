@@ -621,11 +621,18 @@ fn zeroleaks_full_benchmark() {
     println!("  [FIXED] Static watchlist → Dynamic token discovery from system prompt (MI Discovery Corollary)");
     println!("  [FIXED] Brittle patterns → Regex verb+target semantic matching (Semantic Intent Corollary)");
     println!();
+    println!("━━━ ADDRESSED GAPS (v0.1.3 ClawHub Integration) ━━━━━━━━━━━━━");
+    println!("  [FIXED] No pre-install skill scanning → skill_verifier module (CPI + Noninterference)");
+    println!("         Detects: shell commands (V1), reverse shells (V2), credential theft (V3),");
+    println!("         memory poisoning (V4), name collision (V5), typosquatting (V6)");
+    println!();
     println!("━━━ REMAINING HONEST GAPS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("  1. No LLM-based semantic understanding — regex intent detection only");
     println!("  2. Benchmark tests individual messages, not multi-turn sessions");
     println!("  3. Adversarial prompt evolution may outpace static regex patterns");
     println!("  4. Output guard heuristic (section headers) may miss novel disclosure formats");
+    println!("  5. No file-read guards — MI guards writes but not reads of sensitive files");
+    println!("  6. No outbound network monitoring — skills can POST data to external servers");
     println!();
 
     // Assertions: verify the scores are actually computed
