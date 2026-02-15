@@ -101,7 +101,11 @@ fn collect_control_plane_files(
         if path.is_file() {
             add_file_entry(state_dir, &path, files)?;
         } else if path.is_dir() {
-            for entry in WalkDir::new(&path).min_depth(1).into_iter().filter_map(|e| e.ok()) {
+            for entry in WalkDir::new(&path)
+                .min_depth(1)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
                 if entry.file_type().is_file() {
                     add_file_entry(state_dir, entry.path(), files)?;
                 }
@@ -112,7 +116,11 @@ fn collect_control_plane_files(
     // Also snapshot the AER policy
     let policy_dir = config::policy_dir();
     if policy_dir.exists() {
-        for entry in WalkDir::new(&policy_dir).min_depth(1).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(&policy_dir)
+            .min_depth(1)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if entry.file_type().is_file() {
                 add_file_entry(state_dir, entry.path(), files)?;
             }
@@ -123,10 +131,7 @@ fn collect_control_plane_files(
 }
 
 /// Collect workspace memory files.
-fn collect_memory_files(
-    state_dir: &Path,
-    files: &mut Vec<SnapshotFileEntry>,
-) -> io::Result<()> {
+fn collect_memory_files(state_dir: &Path, files: &mut Vec<SnapshotFileEntry>) -> io::Result<()> {
     let workspace = state_dir.join("workspace");
     for filename in config::MEMORY_FILES {
         let path = workspace.join(filename);
@@ -137,17 +142,13 @@ fn collect_memory_files(
     Ok(())
 }
 
-fn add_file_entry(
-    base: &Path,
-    path: &Path,
-    files: &mut Vec<SnapshotFileEntry>,
-) -> io::Result<()> {
-    let relative = path.strip_prefix(base).map_err(|e| {
-        io::Error::new(io::ErrorKind::Other, format!("Path strip error: {e}"))
-    })?;
+fn add_file_entry(base: &Path, path: &Path, files: &mut Vec<SnapshotFileEntry>) -> io::Result<()> {
+    let relative = path
+        .strip_prefix(base)
+        .map_err(|e| io::Error::other(format!("Path strip error: {e}")))?;
     let metadata = fs::metadata(path)?;
     let hash = sha256_file(path)?;
-    let mtime = metadata.modified().ok().map(|t| chrono::DateTime::<Utc>::from(t));
+    let mtime = metadata.modified().ok().map(chrono::DateTime::<Utc>::from);
 
     files.push(SnapshotFileEntry {
         path: relative.to_string_lossy().to_string(),

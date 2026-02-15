@@ -184,8 +184,14 @@ pub fn on_file_write(
 ) -> io::Result<Result<TypedRecord, TypedRecord>> {
     let content_hash = sha256_hex(content);
 
-    // Check if this is a memory file that needs MI guarding
-    let is_memory_file = config::MEMORY_FILES.iter().any(|f| file_path.ends_with(f));
+    // Check if this is a memory file that needs MI guarding.
+    // Use Path::file_name() for exact basename matching to prevent bypass
+    // via crafted paths like "/tmp/not-actually-SOUL.md".
+    let is_memory_file = std::path::Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|basename| config::MEMORY_FILES.contains(&basename))
+        .unwrap_or(false);
 
     if is_memory_file {
         let g = guard::Guard::load_default()?;
@@ -249,11 +255,14 @@ pub fn on_file_write(
 
 /// Hook: detect proxy trust misconfiguration.
 /// Emits an audit warning record (does not block).
-pub fn check_proxy_trust(trusted_proxies: &[String], gateway_addr: &str) -> io::Result<Option<TypedRecord>> {
+pub fn check_proxy_trust(
+    trusted_proxies: &[String],
+    gateway_addr: &str,
+) -> io::Result<Option<TypedRecord>> {
     // Detect common misconfigurations
-    let is_misconfig = trusted_proxies.iter().any(|p| {
-        p == "0.0.0.0/0" || p == "*" || p == "::/0"
-    });
+    let is_misconfig = trusted_proxies
+        .iter()
+        .any(|p| p == "0.0.0.0/0" || p == "*" || p == "::/0");
 
     if is_misconfig {
         let mut meta = RecordMeta::now();

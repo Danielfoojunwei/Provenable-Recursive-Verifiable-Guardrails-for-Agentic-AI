@@ -71,9 +71,8 @@ pub fn read_all_records() -> io::Result<Vec<TypedRecord>> {
         if line.trim().is_empty() {
             continue;
         }
-        let record: TypedRecord = serde_json::from_str(&line).map_err(|e| {
-            io::Error::new(io::ErrorKind::InvalidData, format!("Bad record: {e}"))
-        })?;
+        let record: TypedRecord = serde_json::from_str(&line)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Bad record: {e}")))?;
         records.push(record);
     }
     Ok(records)
@@ -148,7 +147,11 @@ pub fn record_count() -> io::Result<u64> {
     }
     let file = fs::File::open(&path)?;
     let reader = io::BufReader::new(file);
-    Ok(reader.lines().filter_map(|l| l.ok()).filter(|l| !l.trim().is_empty()).count() as u64)
+    Ok(reader
+        .lines()
+        .map_while(Result::ok)
+        .filter(|l| !l.trim().is_empty())
+        .count() as u64)
 }
 
 /// Collect all blob hashes referenced by records.

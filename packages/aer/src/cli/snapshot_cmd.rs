@@ -24,7 +24,12 @@ pub fn create(name: &str, scope_str: &str) -> Result<(), Box<dyn std::error::Err
     if !manifest.files.is_empty() {
         println!("  Contents:");
         for f in &manifest.files {
-            println!("    {} ({} bytes, sha256: {})", f.path, f.size, &f.sha256[..12]);
+            println!(
+                "    {} ({} bytes, sha256: {})",
+                f.path,
+                f.size,
+                &f.sha256[..12]
+            );
         }
     }
 

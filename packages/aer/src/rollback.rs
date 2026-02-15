@@ -26,10 +26,7 @@ pub fn rollback_to_snapshot(snapshot_id: &str) -> io::Result<RollbackReport> {
         let source = snap_blobs.join(&entry.sha256);
 
         if !source.exists() {
-            errors.push(format!(
-                "Blob missing for {}: {}",
-                entry.path, entry.sha256
-            ));
+            errors.push(format!("Blob missing for {}: {}", entry.path, entry.sha256));
             continue;
         }
 

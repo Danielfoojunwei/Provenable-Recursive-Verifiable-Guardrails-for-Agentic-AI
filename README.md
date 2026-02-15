@@ -6,13 +6,219 @@ the **AEGX v0.1** tamper-evident evidence bundle format and the **Agent Evidence
 for agent sessions, tool invocations, file mutations, and control-plane
 changes.
 
+---
+
+## The Problem
+
+Agentic AI systems operate with increasing autonomy — calling tools, modifying
+files, installing skills, and making decisions on behalf of users. This creates
+a fundamental security gap that existing approaches fail to address:
+
+### 1. Unverifiable Agent Behavior
+
+Current AI agent frameworks provide **no cryptographic proof** of what an agent
+did, in what order, or under whose authority. If an agent corrupts data or
+performs unauthorized actions, there is no tamper-evident record to determine
+what happened. Post-incident forensics are impossible when the agent itself
+could have altered its own logs.
+
+### 2. Unguarded Control Planes
+
+Most agent systems allow any input — including untrusted web content, tool
+outputs, and skill responses — to modify the control plane (permissions, tool
+registrations, skill configurations). A single prompt injection or malicious
+tool output can escalate privileges, install backdoor skills, or disable
+security policies without any structural enforcement preventing it.
+
+### 3. Corrupted Persistent Memory
+
+Agents that persist state across sessions (identity files, user preferences,
+agent personality, tool registrations) are vulnerable to **memory poisoning**.
+Tainted data from untrusted sources can be written into durable memory,
+permanently corrupting the agent's behavior in all future sessions. No existing
+system enforces write guards based on data provenance.
+
+### 4. No Provenance Tracking
+
+When an agent produces an output, there is no way to trace the chain of data
+dependencies that influenced it. If a tool output was derived from an untrusted
+web source, downstream decisions based on that output inherit the taint — but
+nothing tracks or enforces this. Confused-deputy attacks are trivial.
+
+### 5. Irreversible Contamination
+
+When contamination is detected, there is no systematic way to identify all
+affected records, compute the contamination closure, and roll back to a
+verified-clean state. Operators resort to manual inspection or full system
+rebuilds.
+
+---
+
+## What This System Delivers
+
+### Outcome 1: Tamper-Evident Evidence Chains
+
+Every action an agent takes — tool calls, file writes, permission changes,
+guard decisions — is recorded as a **TypedRecord** whose identity is the
+SHA-256 hash of its canonical JSON representation. Records are linked by an
+**append-only hash chain** that makes insertion, deletion, or modification of
+any record immediately detectable by any verifier, offline, without trusting
+the producer.
+
+**Concrete guarantee:** Given a bundle, `aegx verify` performs 10-step
+end-to-end verification: schema validation, recordId recomputation, parent
+reference checking, blob hash verification, audit chain integrity, and
+manifest consistency. Any single bit flip anywhere in the bundle is caught.
+
+### Outcome 2: Control-Plane Integrity (CPI)
+
+A **single-chokepoint guard** evaluates every control-plane mutation (skill
+install/enable/disable/update, tool registration, permission changes, gateway
+configuration) against a policy engine. The default deny-by-default policy
+ensures that only `USER` and `SYS` principals can modify the control plane.
+All other principals — `WEB`, `SKILL`, `CHANNEL`, `EXTERNAL`, `TOOL_UNAUTH`,
+`TOOL_AUTH` — are structurally blocked regardless of what they claim in their
+content.
+
+**Concrete guarantee:** Under assumptions A1-A3 (provenance completeness,
+principal accuracy, memory persistence), no untrusted input can alter the
+agent's control plane. Every allow/deny decision is recorded as
+tamper-evident evidence.
+
+### Outcome 3: Memory Integrity (MI)
+
+A **single-chokepoint guard** protects all writes to durable workspace memory
+files (`SOUL.md`, `AGENTS.md`, `TOOLS.md`, `USER.md`, `IDENTITY.md`,
+`HEARTBEAT.md`, `MEMORY.md`). Writes are blocked if:
+
+- The requesting principal is untrusted (`WEB`, `SKILL`, `CHANNEL`, `EXTERNAL`)
+- The data has tainted provenance (`UNTRUSTED`, `INJECTION_SUSPECT`,
+  `WEB_DERIVED`, `SKILL_OUTPUT`)
+
+**Concrete guarantee:** Persistent agent memory cannot be poisoned by
+untrusted inputs. Taint propagates conservatively — if any parent is tainted,
+all descendants are tainted.
+
+### Outcome 4: Verifiable Rollback (RVU)
+
+Snapshots capture SHA-256 hashes of all files in scope (control-plane config,
+workspace memory, or both). Rollback restores files to their exact snapshotted
+content, verifies restoration via hash comparison, and emits a tamper-evident
+`Rollback` record. Contamination closure is computable: given a tainted record,
+the provenance DAG identifies all downstream records that must be invalidated.
+
+**Concrete guarantee:** After rollback, `verify_rollback()` confirms every
+file matches its snapshot hash exactly. The rollback itself is recorded as
+audit evidence.
+
+### Outcome 5: Self-Contained Portable Evidence
+
+Bundles are self-contained directories (or `.aegx.zip` archives) containing
+everything needed for independent, offline verification. No network access, no
+trust in the producer, no special software beyond the verifier. Bundles can be
+shared, archived, and audited by any party.
+
+---
+
+## Formal Foundations
+
+AER implements the structural guarantees from four published formal theorems:
+
+- [Noninterference Theorem](https://github.com/Danielfoojunwei/Noninterference-theorem) — Taint-based isolation ensuring untrusted inputs cannot influence tool selection.
+- [Control-Plane Integrity Theorem](https://github.com/Danielfoojunwei/Control-plane-integrity-theorem-) — Under provenance completeness, principal accuracy, and memory persistence assumptions, no untrusted input alters the control plane.
+- [Memory Integrity Theorem](https://github.com/Danielfoojunwei/Memory-integrity-theorem) — Guarantees immutability, taint blocking, and session isolation for persistent memory.
+- [RVU Machine Unlearning](https://github.com/Danielfoojunwei/RVU-Machine-Unlearning) — Provenance DAG with contamination detection, closure computation, and verifiable recovery certificates.
+
+---
+
+## Security Hardening Status
+
+All critical, high, and moderate security gaps identified during adversarial
+review have been resolved in the reference implementation.
+
+### Resolved: ZIP Extraction Hardening
+
+**Files:** `src/bundle.rs`, `packages/aer/src/bundle.rs`
+
+Both `import_zip` (AEGX core) and `extract_bundle` (AER runtime) now enforce:
+
+- **Path traversal rejection** — Entry names are validated against `..`
+  components, absolute paths (Unix and Windows), and null bytes. Resolved
+  output paths are verified to remain within the target directory.
+- **Zip bomb protection** — Per-entry size limit (1 GB), total extraction
+  limit (10 GB), and maximum entry count (100,000).
+- **Symlink rejection** — Symlink zip entries are rejected. Output paths
+  that are existing symlinks on disk are also rejected (defense-in-depth).
+- **Duplicate entry rejection** — Entry names are tracked; duplicates are
+  rejected. The `zip` crate also enforces this at write time.
+- **UTF-8 enforcement** — Non-UTF-8 entry names (lossy conversion markers)
+  are rejected.
+
+Covered by integration tests in `tests/zip_security.rs`.
+
+### Resolved: Memory File Guard Bypass
+
+**File:** `packages/aer/src/hooks.rs`
+
+The memory file detection in `on_file_write` previously used string
+`ends_with` matching, which could be bypassed with crafted paths like
+`/tmp/not-actually-SOUL.md`. Now uses `Path::file_name()` for exact
+basename matching against the `MEMORY_FILES` whitelist.
+
+### Resolved: Policy File Integrity
+
+**File:** `packages/aer/src/policy.rs`
+
+Policy loading now enforces three layers of protection:
+
+1. **SHA-256 sidecar verification** — `save_policy` writes a `.sha256`
+   sidecar file. `load_policy` verifies the hash on load if the sidecar
+   exists. Tampering is detected and rejected.
+2. **Permission validation** — On Unix, world-writable policy files are
+   rejected (`chmod o-w` required).
+3. **Structural safety validation** — Loaded policies are checked for
+   structurally dangerous rules. Any rule that allows untrusted principals
+   (`WEB`, `SKILL`, `CHANNEL`, `EXTERNAL`) to modify the control plane
+   is rejected, even if the YAML parses correctly.
+
+### Resolved: `/tmp` Fallback Removed
+
+**File:** `packages/aer/src/config.rs`
+
+`resolve_state_dir()` no longer falls back to `/tmp` when `HOME` is unset.
+The process panics with a clear error message directing the operator to set
+`HOME`, `OPENCLAW_HOME`, or `OPENCLAW_STATE_DIR`.
+
+### Resolved: Guard Rate Limiting
+
+**File:** `packages/aer/src/guard.rs`
+
+Guard denial decisions are now rate-limited to 100 denials per 60-second
+window. Exceeding this limit returns an error, preventing log flooding
+attacks where a malicious agent spams denied requests to fill the audit log
+with noise.
+
+### Remaining Considerations
+
+These are architectural enhancements documented in `THREAT_MODEL.md` that
+require design decisions beyond the reference implementation scope:
+
+| Item | Status | Notes |
+|------|--------|-------|
+| External witness (RFC 3161 / transparency log) | Future | Prevents full-chain forgery by an attacker with filesystem access |
+| Bundle signing (Ed25519) | Future | Enables origin authentication without out-of-band mechanisms |
+| CI security scanning (`cargo audit`, `cargo deny`) | Operational | Recommended for deployment pipelines |
+| Assumptions A1-A5 | Preconditions | Documented in `docs/aer-threat-model.md`; must be ensured by the caller |
+
+---
+
 ## What is AEGX?
 
 AEGX (Agent Evidence eXchange) is a content-addressed, append-only evidence
 format. Every action an agent takes is recorded as a **TypedRecord** whose
 identity is the SHA-256 hash of its canonical JSON representation. Records are
-linked together by an **audit hash chain** that makes any tampering --
-insertion, deletion, or modification -- immediately detectable.
+linked together by an **audit hash chain** that makes any tampering —
+insertion, deletion, or modification — immediately detectable.
 
 Key properties:
 
@@ -41,14 +247,36 @@ AER is the runtime subsystem that enforces structural security:
 - **Incident Bundle Export:** Exports self-contained `.aegx.zip` evidence
   bundles with independent verification tooling.
 
-### Formal Foundations
+### Trust Lattice
 
-AER implements the structural guarantees from four formal theorems:
+Principals are assigned based on **transport channel**, not content claims.
+This prevents confused-deputy attacks.
 
-- [Noninterference Theorem](https://github.com/Danielfoojunwei/Noninterference-theorem) -- Taint-based isolation ensuring untrusted inputs cannot influence tool selection.
-- [Control-Plane Integrity Theorem](https://github.com/Danielfoojunwei/Control-plane-integrity-theorem-) -- Under provenance completeness, principal accuracy, and memory persistence assumptions, no untrusted input alters the control plane.
-- [Memory Integrity Theorem](https://github.com/Danielfoojunwei/Memory-integrity-theorem) -- Guarantees immutability, taint blocking, and session isolation for persistent memory.
-- [RVU Machine Unlearning](https://github.com/Danielfoojunwei/RVU-Machine-Unlearning) -- Provenance DAG with contamination detection, closure computation, and verifiable recovery certificates.
+```
+SYS (trust level 5)
+ └── USER (trust level 4)
+      └── TOOL_AUTH (trust level 3)
+           └── TOOL_UNAUTH (trust level 2)
+                └── WEB, SKILL (trust level 1)
+                     └── CHANNEL, EXTERNAL (trust level 0)
+```
+
+### Taint Model
+
+Taint flags propagate conservatively (union of all parent taints):
+
+| Flag | Bit | Meaning |
+|------|-----|---------|
+| UNTRUSTED | 0x01 | From untrusted source |
+| INJECTION_SUSPECT | 0x02 | Potential injection payload |
+| PROXY_DERIVED | 0x04 | Derived from proxy/forwarded request |
+| SECRET_RISK | 0x08 | May contain secrets |
+| CROSS_SESSION | 0x10 | Transferred across sessions |
+| TOOL_OUTPUT | 0x20 | Output from tool execution |
+| SKILL_OUTPUT | 0x40 | Output from skill execution |
+| WEB_DERIVED | 0x80 | Derived from web/HTTP source |
+
+---
 
 ## Quick Start
 

@@ -30,7 +30,7 @@ pub fn run(bundle_path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let reader = io::BufReader::new(file);
         reader
             .lines()
-            .filter_map(|l| l.ok())
+            .map_while(Result::ok)
             .filter(|l| !l.trim().is_empty())
             .filter_map(|l| serde_json::from_str::<TypedRecord>(&l).ok())
             .collect()
@@ -43,7 +43,7 @@ pub fn run(bundle_path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let reader = io::BufReader::new(file);
         reader
             .lines()
-            .filter_map(|l| l.ok())
+            .map_while(Result::ok)
             .filter(|l| !l.trim().is_empty())
             .filter_map(|l| serde_json::from_str::<AuditEntry>(&l).ok())
             .collect()

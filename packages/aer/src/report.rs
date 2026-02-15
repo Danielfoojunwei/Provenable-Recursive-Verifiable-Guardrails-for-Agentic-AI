@@ -3,10 +3,7 @@ use chrono::Utc;
 use serde_json::json;
 
 /// Generate a Markdown report from records and audit entries.
-pub fn generate_markdown_report(
-    records: &[TypedRecord],
-    audit_entries: &[AuditEntry],
-) -> String {
+pub fn generate_markdown_report(records: &[TypedRecord], audit_entries: &[AuditEntry]) -> String {
     let mut md = String::new();
     md.push_str("# AER Evidence Report\n\n");
     md.push_str(&format!("Generated: {}\n\n", Utc::now().to_rfc3339()));
@@ -19,7 +16,9 @@ pub fn generate_markdown_report(
     // Record type breakdown
     let mut type_counts = std::collections::HashMap::new();
     for r in records {
-        *type_counts.entry(format!("{:?}", r.record_type)).or_insert(0u64) += 1;
+        *type_counts
+            .entry(format!("{:?}", r.record_type))
+            .or_insert(0u64) += 1;
     }
     md.push_str("\n### Record Types\n\n");
     md.push_str("| Type | Count |\n|------|-------|\n");
@@ -36,12 +35,15 @@ pub fn generate_markdown_report(
         .collect();
     if !guard_decisions.is_empty() {
         md.push_str("\n## Guard Decisions\n\n");
-        let allow_count = guard_decisions.iter().filter(|r| {
-            matches!(&r.payload, Payload::Inline { data } if data.get("guard_decision")
+        let allow_count = guard_decisions
+            .iter()
+            .filter(|r| {
+                matches!(&r.payload, Payload::Inline { data } if data.get("guard_decision")
                 .and_then(|d| d.get("verdict"))
                 .and_then(|v| v.as_str())
                 == Some("Allow"))
-        }).count();
+            })
+            .count();
         let deny_count = guard_decisions.len() - allow_count;
         md.push_str(&format!("- Allowed: {}\n", allow_count));
         md.push_str(&format!("- Denied: {}\n", deny_count));
@@ -51,8 +53,14 @@ pub fn generate_markdown_report(
             if let Payload::Inline { data } = &r.payload {
                 if let Some(gd) = data.get("guard_decision") {
                     if gd.get("verdict").and_then(|v| v.as_str()) == Some("Deny") {
-                        let surface = gd.get("surface").and_then(|s| s.as_str()).unwrap_or("unknown");
-                        let rule = gd.get("rule_id").and_then(|s| s.as_str()).unwrap_or("unknown");
+                        let surface = gd
+                            .get("surface")
+                            .and_then(|s| s.as_str())
+                            .unwrap_or("unknown");
+                        let rule = gd
+                            .get("rule_id")
+                            .and_then(|s| s.as_str())
+                            .unwrap_or("unknown");
                         let rationale = gd.get("rationale").and_then(|s| s.as_str()).unwrap_or("");
                         md.push_str(&format!(
                             "- **{}** (rule: `{}`): {}\n",
@@ -82,7 +90,9 @@ pub fn generate_markdown_report(
     // Principal distribution
     let mut principal_counts = std::collections::HashMap::new();
     for r in records {
-        *principal_counts.entry(format!("{:?}", r.principal)).or_insert(0u64) += 1;
+        *principal_counts
+            .entry(format!("{:?}", r.principal))
+            .or_insert(0u64) += 1;
     }
     md.push_str("\n## Principal Distribution\n\n");
     md.push_str("| Principal | Records |\n|-----------|--------|\n");
@@ -102,19 +112,24 @@ pub fn generate_json_report(
 ) -> serde_json::Result<String> {
     let mut type_counts = std::collections::HashMap::new();
     for r in records {
-        *type_counts.entry(format!("{:?}", r.record_type)).or_insert(0u64) += 1;
+        *type_counts
+            .entry(format!("{:?}", r.record_type))
+            .or_insert(0u64) += 1;
     }
 
     let guard_decisions: Vec<_> = records
         .iter()
         .filter(|r| r.record_type == RecordType::GuardDecision)
         .collect();
-    let allow_count = guard_decisions.iter().filter(|r| {
-        matches!(&r.payload, Payload::Inline { data } if data.get("guard_decision")
+    let allow_count = guard_decisions
+        .iter()
+        .filter(|r| {
+            matches!(&r.payload, Payload::Inline { data } if data.get("guard_decision")
             .and_then(|d| d.get("verdict"))
             .and_then(|v| v.as_str())
             == Some("Allow"))
-    }).count();
+        })
+        .count();
 
     let report = json!({
         "generated_at": Utc::now().to_rfc3339(),

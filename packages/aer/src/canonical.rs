@@ -1,5 +1,5 @@
-use sha2::{Digest, Sha256};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 /// Produce a canonical JSON byte representation suitable for hashing.
 /// Rules:
@@ -138,7 +138,10 @@ mod tests {
     fn test_sha256_known_vector() {
         // SHA-256 of empty string
         let h = sha256_hex(b"");
-        assert_eq!(h, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert_eq!(
+            h,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
     }
 
     #[test]

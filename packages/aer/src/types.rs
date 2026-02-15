@@ -69,9 +69,8 @@ impl Serialize for TaintFlags {
 impl<'de> Deserialize<'de> for TaintFlags {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let bits = u32::deserialize(deserializer)?;
-        TaintFlags::from_bits(bits).ok_or_else(|| {
-            serde::de::Error::custom(format!("invalid taint flags: {bits}"))
-        })
+        TaintFlags::from_bits(bits)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid taint flags: {bits}")))
     }
 }
 
