@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OpenClaw AER installer uses a tag-based release process with automated CI validation.
+The OpenClaw AER installer uses a tag-based release process with automated CI validation. All tooling is written in Rust.
 
 ## Version Scheme
 
@@ -22,29 +22,41 @@ installer/install/install-openclaw-aer.sh  → INSTALLER_VERSION
 installer/install/install-openclaw-aer.ps1  → $InstallerVersion
 ```
 
-### 2. Regenerate Checksums
+### 2. Build the Rust tools (if not already built)
 
 ```bash
 cd installer
-python3 scripts/gen_checksums.py
+cargo build --manifest-path tools/Cargo.toml
+```
+
+### 3. Regenerate Checksums
+
+```bash
+tools/target/debug/installer-tools gen-checksums
 ```
 
 This updates `manifest.json` with new artifact SHA-256 hashes and regenerates `checksums.txt`.
 
-### 3. Validate
+### 4. Validate
 
 ```bash
-python3 scripts/validate_manifest.py
+tools/target/debug/installer-tools validate
 ```
 
-### 4. Run Smoke Tests
+### 5. Run Tests
+
+```bash
+cargo test --manifest-path tools/Cargo.toml -- --test-threads=1
+```
+
+### 6. Run Smoke Tests
 
 ```bash
 chmod +x install/install-openclaw-aer.sh scripts/smoke_install_unix.sh
 bash scripts/smoke_install_unix.sh
 ```
 
-### 5. Commit and Tag
+### 7. Commit and Tag
 
 ```bash
 git add installer/
@@ -53,14 +65,15 @@ git tag installer-vX.Y.Z
 git push origin main --tags
 ```
 
-### 6. Automated Release
+### 8. Automated Release
 
 The `release.yml` workflow triggers on `installer-v*` tags and:
 
-1. Validates the manifest
-2. Verifies checksums haven't drifted
-3. Runs smoke tests on Ubuntu and macOS
-4. Creates a GitHub Release with the installer artifacts
+1. Builds the Rust tools
+2. Validates the manifest
+3. Verifies checksums haven't drifted
+4. Runs smoke tests on Ubuntu and macOS
+5. Creates a GitHub Release with the installer artifacts
 
 ## Pinning a New OpenClaw Version
 
@@ -78,24 +91,24 @@ The `release.yml` workflow triggers on `installer-v*` tags and:
 cd installer
 
 # Pin version (verifies on npm first)
-python3 scripts/pin_openclaw.py --version 1.2.3
+tools/target/debug/installer-tools pin-version --version 1.2.3
 
 # Pin and set as default
-python3 scripts/pin_openclaw.py --version 1.2.3 --set-default
+tools/target/debug/installer-tools pin-version --version 1.2.3 --set-default
 
 # Skip npm check (for testing only)
-python3 scripts/pin_openclaw.py --version 1.2.3 --skip-npm-check
+tools/target/debug/installer-tools pin-version --version 1.2.3 --skip-npm-check
 ```
 
-### What pin_openclaw.py Does
+### What `pin-version` Does
 
 1. Validates version format (semver)
 2. Verifies version exists on npm (`npm view openclaw@X.Y.Z`)
 3. Fetches `engines.node` requirement from npm
 4. Adds version to `manifest.json` pinned_versions
 5. Optionally sets it as default_version
-6. Runs `validate_manifest.py` to check consistency
-7. Runs `gen_checksums.py` to update hashes
+6. Runs `validate` to check consistency
+7. Runs `gen-checksums` to update hashes
 
 ## Deprecating a Version
 
@@ -104,7 +117,7 @@ To remove a version from the allowlist without deleting its entry:
 1. Edit `manifest/manifest.json`
 2. Set `"allowed": false` for the version
 3. Ensure `default_version` points to an allowed version
-4. Run `python3 scripts/validate_manifest.py`
+4. Run `tools/target/debug/installer-tools validate`
 5. Commit and push
 
 ## CI Pipeline
@@ -113,10 +126,11 @@ Every push to `main` or PR targeting `main` (under `installer/` paths) runs:
 
 | Job | Description |
 |-----|-------------|
+| `build-tools` | Compiles the Rust `installer-tools` binary |
 | `validate-manifest` | Schema and consistency checks |
 | `verify-checksums` | Regenerates and checks for drift |
+| `rust-tests` | 18 integration tests |
 | `lint-shell` | ShellCheck on `.sh` files |
-| `lint-python` | Syntax check on `.py` files |
 | `smoke-unix` | Smoke tests on Ubuntu + macOS |
 | `smoke-windows` | Smoke tests on Windows |
 | `security-scan` | Verifies security defaults |

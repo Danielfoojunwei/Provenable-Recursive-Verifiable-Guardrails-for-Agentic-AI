@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # smoke_install_unix.sh — Smoke test for install-openclaw-aer.sh
 # Verifies the installer runs, creates expected structure, and applies security defaults.
+# All tooling is Rust-based (no Python dependency).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 INSTALLER="$REPO_ROOT/install/install-openclaw-aer.sh"
+TOOLS_BIN="$REPO_ROOT/tools/target/debug/installer-tools"
 
 PASS=0
 FAIL=0
@@ -35,7 +37,16 @@ echo "=== Smoke Test: install-openclaw-aer.sh ==="
 echo "Install dir: $INSTALL_DIR"
 echo ""
 
+# ── Build Rust tools if needed ────────────────────────────────────
+echo "--- Build Rust tooling ---"
+if [ ! -f "$TOOLS_BIN" ]; then
+  echo "  Building installer-tools..."
+  (cd "$REPO_ROOT/tools" && cargo build --quiet 2>&1)
+fi
+assert_file "$TOOLS_BIN" "installer-tools binary exists"
+
 # ── Test 1: Installer exists and is executable ────────────────────
+echo ""
 echo "--- Pre-flight ---"
 assert_file "$INSTALLER" "Installer script exists"
 if [ -x "$INSTALLER" ]; then
@@ -63,18 +74,16 @@ else
   pass "Non-semver version rejected"
 fi
 
-# ── Test 4: Manifest validation ───────────────────────────────────
+# ── Test 4: Manifest validation (Rust) ────────────────────────────
 echo ""
-echo "--- Manifest validation ---"
+echo "--- Manifest validation (Rust) ---"
 MANIFEST="$REPO_ROOT/manifest/manifest.json"
 assert_file "$MANIFEST" "manifest.json exists"
 
-# Validate manifest with Python script
-VALIDATE_SCRIPT="$REPO_ROOT/scripts/validate_manifest.py"
-if python3 "$VALIDATE_SCRIPT" 2>/dev/null; then
-  pass "validate_manifest.py passes"
+if "$TOOLS_BIN" validate --manifest "$MANIFEST" 2>/dev/null; then
+  pass "installer-tools validate passes"
 else
-  fail "validate_manifest.py failed"
+  fail "installer-tools validate failed"
 fi
 
 # ── Test 5: Manifest schema checks ───────────────────────────────
@@ -93,21 +102,42 @@ assert_contains "$INSTALLER" '127.0.0.1' "Script binds to 127.0.0.1"
 assert_contains "$INSTALLER" 'authRequired' "Script sets authRequired"
 assert_contains "$INSTALLER" 'trustedProxies' "Script sets trustedProxies"
 
-# ── Test 7: Python tooling ────────────────────────────────────────
+# ── Test 7: Rust tooling ─────────────────────────────────────────
 echo ""
-echo "--- Python tooling ---"
-assert_file "$REPO_ROOT/scripts/validate_manifest.py" "validate_manifest.py exists"
-assert_file "$REPO_ROOT/scripts/gen_checksums.py" "gen_checksums.py exists"
-assert_file "$REPO_ROOT/scripts/pin_openclaw.py" "pin_openclaw.py exists"
+echo "--- Rust tooling ---"
+assert_file "$REPO_ROOT/tools/Cargo.toml" "tools/Cargo.toml exists"
+assert_file "$REPO_ROOT/tools/src/main.rs" "tools/src/main.rs exists"
+assert_file "$REPO_ROOT/tools/src/manifest.rs" "tools/src/manifest.rs exists"
+assert_file "$REPO_ROOT/tools/src/validate.rs" "tools/src/validate.rs exists"
+assert_file "$REPO_ROOT/tools/src/checksums.rs" "tools/src/checksums.rs exists"
+assert_file "$REPO_ROOT/tools/src/pin.rs" "tools/src/pin.rs exists"
 
-# Check Python scripts are valid syntax
-for script in validate_manifest.py gen_checksums.py pin_openclaw.py; do
-  if python3 -c "import py_compile; py_compile.compile('$REPO_ROOT/scripts/$script', doraise=True)" 2>/dev/null; then
-    pass "$script has valid Python syntax"
-  else
-    fail "$script has syntax errors"
-  fi
-done
+# ── Test 8: Rust tools subcommand help ────────────────────────────
+echo ""
+echo "--- Rust tools CLI ---"
+if "$TOOLS_BIN" --help >/dev/null 2>&1; then
+  pass "installer-tools --help works"
+else
+  fail "installer-tools --help failed"
+fi
+
+if "$TOOLS_BIN" validate --help >/dev/null 2>&1; then
+  pass "installer-tools validate --help works"
+else
+  fail "installer-tools validate --help failed"
+fi
+
+if "$TOOLS_BIN" gen-checksums --help >/dev/null 2>&1; then
+  pass "installer-tools gen-checksums --help works"
+else
+  fail "installer-tools gen-checksums --help failed"
+fi
+
+if "$TOOLS_BIN" pin-version --help >/dev/null 2>&1; then
+  pass "installer-tools pin-version --help works"
+else
+  fail "installer-tools pin-version --help failed"
+fi
 
 # ── Summary ───────────────────────────────────────────────────────
 echo ""

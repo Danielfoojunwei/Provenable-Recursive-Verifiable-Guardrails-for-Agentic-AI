@@ -20,7 +20,7 @@ The installer enforces a strict version allowlist:
 1. Only versions listed in `manifest/manifest.json` with `"allowed": true` can be installed
 2. Versions must pass semver format validation (`X.Y.Z`)
 3. New versions are verified against npm before pinning
-4. The `pin_openclaw.py` script automates this with npm verification
+4. The `installer-tools pin-version` command automates this with npm verification
 
 This prevents:
 - Installation of yanked or compromised npm packages

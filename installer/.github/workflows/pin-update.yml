@@ -34,9 +34,10 @@ jobs:
         with:
           node-version: '22'
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build tools
+        run: cargo build --manifest-path tools/Cargo.toml
 
       - name: Validate version format
         run: |
@@ -51,10 +52,10 @@ jobs:
           if [ "${{ github.event.inputs.set_default }}" = "true" ]; then
             ARGS="$ARGS --set-default"
           fi
-          python3 scripts/pin_openclaw.py $ARGS
+          tools/target/debug/installer-tools pin-version $ARGS
 
       - name: Validate manifest after pin
-        run: python3 scripts/validate_manifest.py
+        run: tools/target/debug/installer-tools validate
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6

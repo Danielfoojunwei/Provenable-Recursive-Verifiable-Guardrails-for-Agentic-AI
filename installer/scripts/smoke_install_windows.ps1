@@ -4,7 +4,8 @@
     Smoke test for install-openclaw-aer.ps1
 .DESCRIPTION
     Verifies the installer script structure, manifest, security defaults,
-    and Python tooling without performing a full npm install.
+    and Rust tooling without performing a full npm install.
+    All tooling is Rust-based (no Python dependency).
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
 $Installer = Join-Path $RepoRoot "install" "install-openclaw-aer.ps1"
+$ToolsBin = Join-Path $RepoRoot "tools" "target" "debug" "installer-tools.exe"
 
 $Pass = 0
 $Fail = 0
@@ -48,7 +50,18 @@ function Assert-Contains {
 Write-Host "=== Smoke Test: install-openclaw-aer.ps1 ===" -ForegroundColor Cyan
 Write-Host ""
 
+# Build Rust tools if needed
+Write-Host "--- Build Rust tooling ---"
+if (-not (Test-Path $ToolsBin)) {
+    Write-Host "  Building installer-tools..."
+    Push-Location (Join-Path $RepoRoot "tools")
+    & cargo build --quiet 2>&1
+    Pop-Location
+}
+Assert-FileExists $ToolsBin "installer-tools binary exists"
+
 # Test 1: Installer exists
+Write-Host ""
 Write-Host "--- Pre-flight ---"
 Assert-FileExists $Installer "Installer script exists"
 
@@ -62,32 +75,21 @@ try {
     Test-Fail "-Help did not exit cleanly"
 }
 
-# Test 3: Manifest validation
+# Test 3: Manifest validation (Rust)
 Write-Host ""
-Write-Host "--- Manifest validation ---"
+Write-Host "--- Manifest validation (Rust) ---"
 $Manifest = Join-Path $RepoRoot "manifest" "manifest.json"
 Assert-FileExists $Manifest "manifest.json exists"
 
-$ValidateScript = Join-Path $RepoRoot "scripts" "validate_manifest.py"
 try {
-    $result = & python3 $ValidateScript 2>&1
+    $result = & $ToolsBin validate --manifest $Manifest 2>&1
     if ($LASTEXITCODE -eq 0) {
-        Test-Pass "validate_manifest.py passes"
+        Test-Pass "installer-tools validate passes"
     } else {
-        Test-Fail "validate_manifest.py failed: $result"
+        Test-Fail "installer-tools validate failed: $result"
     }
 } catch {
-    # python3 might not be available on Windows, try python
-    try {
-        $result = & python $ValidateScript 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Test-Pass "validate_manifest.py passes"
-        } else {
-            Test-Fail "validate_manifest.py failed: $result"
-        }
-    } catch {
-        Test-Fail "Python not available to run validate_manifest.py"
-    }
+    Test-Fail "installer-tools validate threw exception: $_"
 }
 
 # Test 4: Manifest content
@@ -106,14 +108,36 @@ Assert-Contains $Installer "127.0.0.1" "Script binds to 127.0.0.1"
 Assert-Contains $Installer "authRequired" "Script sets authRequired"
 Assert-Contains $Installer "trustedProxies" "Script sets trustedProxies"
 
-# Test 6: Python tooling exists
+# Test 6: Rust tooling exists
 Write-Host ""
-Write-Host "--- Python tooling ---"
-Assert-FileExists (Join-Path $RepoRoot "scripts" "validate_manifest.py") "validate_manifest.py exists"
-Assert-FileExists (Join-Path $RepoRoot "scripts" "gen_checksums.py") "gen_checksums.py exists"
-Assert-FileExists (Join-Path $RepoRoot "scripts" "pin_openclaw.py") "pin_openclaw.py exists"
+Write-Host "--- Rust tooling ---"
+Assert-FileExists (Join-Path $RepoRoot "tools" "Cargo.toml") "tools/Cargo.toml exists"
+Assert-FileExists (Join-Path $RepoRoot "tools" "src" "main.rs") "tools/src/main.rs exists"
+Assert-FileExists (Join-Path $RepoRoot "tools" "src" "manifest.rs") "tools/src/manifest.rs exists"
+Assert-FileExists (Join-Path $RepoRoot "tools" "src" "validate.rs") "tools/src/validate.rs exists"
+Assert-FileExists (Join-Path $RepoRoot "tools" "src" "checksums.rs") "tools/src/checksums.rs exists"
+Assert-FileExists (Join-Path $RepoRoot "tools" "src" "pin.rs") "tools/src/pin.rs exists"
 
-# Test 7: PowerShell installer has no syntax errors
+# Test 7: Rust tools CLI help
+Write-Host ""
+Write-Host "--- Rust tools CLI ---"
+try {
+    & $ToolsBin --help | Out-Null
+    if ($LASTEXITCODE -eq 0) { Test-Pass "installer-tools --help works" }
+    else { Test-Fail "installer-tools --help failed" }
+} catch {
+    Test-Fail "installer-tools --help threw exception"
+}
+
+try {
+    & $ToolsBin validate --help | Out-Null
+    if ($LASTEXITCODE -eq 0) { Test-Pass "installer-tools validate --help works" }
+    else { Test-Fail "installer-tools validate --help failed" }
+} catch {
+    Test-Fail "installer-tools validate --help threw exception"
+}
+
+# Test 8: PowerShell installer syntax check
 Write-Host ""
 Write-Host "--- Syntax check ---"
 try {

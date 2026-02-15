@@ -107,32 +107,23 @@ fi
 ok "Manifest fetched"
 
 # ── Parse manifest ────────────────────────────────────────────────
-if ! command -v python3 >/dev/null 2>&1; then
-  fatal "python3 is required to parse the manifest"
-fi
-
-# Extract values from manifest using python3 (avoids jq dependency)
+# Uses Node.js (already a prerequisite) for JSON parsing — no Python needed
 parse_manifest() {
-  python3 -c "
-import json, sys
-with open('$MANIFEST_FILE') as f:
-    m = json.load(f)
-field = sys.argv[1]
-if field == 'default_version':
-    print(m['openclaw']['default_version'])
-elif field == 'install_mode':
-    print(m['openclaw']['install_mode'])
-elif field == 'schema_version':
-    print(m['schema_version'])
-elif field == 'allowed_versions':
-    vs = [e['version'] for e in m['openclaw']['pinned_versions'] if e.get('allowed')]
-    print(' '.join(vs))
-elif field == 'engines_node_min':
-    ver = sys.argv[2]
-    for e in m['openclaw']['pinned_versions']:
-        if e['version'] == ver:
-            print(e.get('engines_node_min', '>=22.0.0'))
-            break
+  node -e "
+const fs = require('fs');
+const m = JSON.parse(fs.readFileSync('$MANIFEST_FILE', 'utf8'));
+const field = process.argv[1];
+if (field === 'default_version') console.log(m.openclaw.default_version);
+else if (field === 'install_mode') console.log(m.openclaw.install_mode);
+else if (field === 'schema_version') console.log(m.schema_version);
+else if (field === 'allowed_versions') {
+  const vs = m.openclaw.pinned_versions.filter(e => e.allowed).map(e => e.version);
+  console.log(vs.join(' '));
+} else if (field === 'engines_node_min') {
+  const ver = process.argv[2];
+  const entry = m.openclaw.pinned_versions.find(e => e.version === ver);
+  console.log(entry ? (entry.engines_node_min || '>=22.0.0') : '>=22.0.0');
+}
 " "$@"
 }
 

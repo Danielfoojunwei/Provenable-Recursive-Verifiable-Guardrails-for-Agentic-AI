@@ -50,7 +50,13 @@ The `manifest/manifest.json` file is the source of truth for:
 
 ```bash
 cd installer
-python3 scripts/validate_manifest.py
+cargo run --manifest-path tools/Cargo.toml -- validate
+```
+
+Or if you've already built the binary:
+
+```bash
+tools/target/debug/installer-tools validate
 ```
 
 This checks:
@@ -65,7 +71,7 @@ This checks:
 
 ```bash
 cd installer
-python3 scripts/gen_checksums.py
+tools/target/debug/installer-tools gen-checksums
 ```
 
 This recomputes SHA-256 hashes for all artifacts and updates both `manifest.json` and `checksums.txt`.
@@ -74,11 +80,12 @@ This recomputes SHA-256 hashes for all artifacts and updates both `manifest.json
 
 Every push and pull request runs automated verification:
 
-1. **Manifest validation** — `validate_manifest.py` checks schema
-2. **Checksum drift detection** — Regenerates checksums and verifies no changes
-3. **ShellCheck** — Static analysis of shell scripts
-4. **Python syntax** — Validates all Python scripts compile
-5. **Smoke tests** — Runs on Ubuntu, macOS, and Windows
+1. **Rust build** — Compiles the `installer-tools` binary
+2. **Manifest validation** — `installer-tools validate` checks schema
+3. **Checksum drift detection** — Regenerates checksums and verifies no changes
+4. **Rust tests** — 18 integration tests covering validation, checksums, pinning, and security defaults
+5. **ShellCheck** — Static analysis of shell scripts
+6. **Smoke tests** — Runs on Ubuntu, macOS, and Windows
 
 ## Security Defaults Audit
 
@@ -97,7 +104,7 @@ The installer only installs versions listed in `manifest.json` under `openclaw.p
 To pin a new version:
 
 ```bash
-python3 scripts/pin_openclaw.py --version X.Y.Z
+tools/target/debug/installer-tools pin-version --version X.Y.Z
 ```
 
 This verifies the version exists on npm before adding it to the manifest.

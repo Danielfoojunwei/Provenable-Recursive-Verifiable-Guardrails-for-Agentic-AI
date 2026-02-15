@@ -19,16 +19,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build tools
+        run: cargo build --manifest-path tools/Cargo.toml
 
       - name: Validate manifest
-        run: python3 scripts/validate_manifest.py
+        run: tools/target/debug/installer-tools validate
 
       - name: Regenerate checksums and verify no drift
         run: |
-          python3 scripts/gen_checksums.py
+          tools/target/debug/installer-tools gen-checksums
           if ! git diff --exit-code manifest/manifest.json checksums.txt; then
             echo "ERROR: Checksums out of date"
             exit 1
@@ -48,9 +49,10 @@ jobs:
         with:
           node-version: '22'
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build tools
+        run: cargo build --manifest-path tools/Cargo.toml
 
       - name: Run smoke tests
         run: |
@@ -64,16 +66,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build tools
+        run: cargo build --manifest-path tools/Cargo.toml
 
       - name: Extract version from tag
         id: version
         run: echo "version=${GITHUB_REF_NAME#installer-v}" >> "$GITHUB_OUTPUT"
 
       - name: Generate checksums
-        run: python3 scripts/gen_checksums.py
+        run: tools/target/debug/installer-tools gen-checksums
 
       - name: Create release
         uses: softprops/action-gh-release@v2

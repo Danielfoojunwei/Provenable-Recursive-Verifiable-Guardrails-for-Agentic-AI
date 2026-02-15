@@ -1,6 +1,6 @@
 # OpenClaw AER Installer
 
-Open-source installer for [OpenClaw](https://github.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI) with **Agent Evidence & Recovery (AER)** guardrails.
+Open-source installer for [OpenClaw](https://github.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI) with **Agent Evidence & Recovery (AER)** guardrails. All tooling is written in Rust.
 
 ## Quick Install
 
@@ -30,7 +30,7 @@ bash install-openclaw-aer.sh --version 0.1.0
 
 - **Node.js >= 22.0.0** (LTS recommended)
 - **npm** (bundled with Node.js)
-- **python3** (for manifest parsing; pre-installed on macOS/Linux)
+- **Rust toolchain** (for building the installer tools; not needed for end-user installation)
 
 ## Security Defaults
 
@@ -57,28 +57,35 @@ The installer applies security-safe defaults out of the box:
 
 ```
 installer/
-├── install/                    # Installer scripts
-│   ├── install-openclaw-aer.sh     # macOS / Linux
-│   └── install-openclaw-aer.ps1    # Windows
+├── install/                        # Installer scripts
+│   ├── install-openclaw-aer.sh         # macOS / Linux
+│   └── install-openclaw-aer.ps1        # Windows
 ├── manifest/
-│   └── manifest.json           # Pinned version manifest
-├── scripts/                    # Tooling
-│   ├── validate_manifest.py    # Manifest schema validator
-│   ├── gen_checksums.py        # SHA-256 checksum generator
-│   ├── pin_openclaw.py         # Version pinning script
-│   ├── smoke_install_unix.sh   # Unix smoke tests
-│   └── smoke_install_windows.ps1   # Windows smoke tests
+│   └── manifest.json               # Pinned version manifest
+├── tools/                          # Rust tooling
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── main.rs                     # CLI entry point
+│   │   ├── manifest.rs                 # Manifest types & helpers
+│   │   ├── validate.rs                 # validate subcommand
+│   │   ├── checksums.rs                # gen-checksums subcommand
+│   │   └── pin.rs                      # pin-version subcommand
+│   └── tests/
+│       └── integration_tests.rs        # 18 integration tests
+├── scripts/                        # Smoke tests
+│   ├── smoke_install_unix.sh           # Unix smoke tests
+│   └── smoke_install_windows.ps1       # Windows smoke tests
 ├── docs/
-│   ├── VERIFY.md               # Checksum verification guide
-│   ├── SECURITY.md             # Security policy
-│   └── RELEASE.md              # Release process
+│   ├── VERIFY.md                   # Checksum verification guide
+│   ├── SECURITY.md                 # Security policy
+│   └── RELEASE.md                  # Release process
 ├── .github/workflows/
-│   ├── ci.yml                  # CI pipeline
-│   ├── release.yml             # Release automation
-│   └── pin-update.yml          # Version pin workflow
-├── checksums.txt               # SHA-256 checksums for artifacts
-├── LICENSE                     # MIT License
-└── README.md                   # This file
+│   ├── ci.yml                      # CI pipeline
+│   ├── release.yml                 # Release automation
+│   └── pin-update.yml              # Version pin workflow
+├── checksums.txt                   # SHA-256 checksums for artifacts
+├── LICENSE                         # MIT License
+└── README.md                       # This file
 ```
 
 ## Verification
@@ -101,22 +108,35 @@ See [docs/VERIFY.md](docs/VERIFY.md) for detailed verification instructions.
 
 ## Development
 
+### Build Rust Tools
+
+```bash
+cd installer
+cargo build --manifest-path tools/Cargo.toml
+```
+
 ### Validate Manifest
 
 ```bash
-python3 scripts/validate_manifest.py
+tools/target/debug/installer-tools validate
 ```
 
 ### Regenerate Checksums
 
 ```bash
-python3 scripts/gen_checksums.py
+tools/target/debug/installer-tools gen-checksums
 ```
 
 ### Pin a New Version
 
 ```bash
-python3 scripts/pin_openclaw.py --version X.Y.Z --set-default
+tools/target/debug/installer-tools pin-version --version X.Y.Z --set-default
+```
+
+### Run Tests
+
+```bash
+cargo test --manifest-path tools/Cargo.toml -- --test-threads=1
 ```
 
 ### Run Smoke Tests
