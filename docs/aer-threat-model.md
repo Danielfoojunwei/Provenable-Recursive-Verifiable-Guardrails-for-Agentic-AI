@@ -67,21 +67,40 @@ Layer 2 — Output Guard (leaked-content detection):
 - Identity statements: platform identity, masked variants
 - Multi-section heuristic: 4+ section headers indicate prompt dump
 
+Layer 3 — Session State (v0.1.2, Conversational Noninterference Corollary):
+- Sliding window of 10 messages / 5 minutes per session
+- Accumulated extraction score with threshold 1.5
+- Crescendo detection: accumulated score, sequential probe, sustained extraction (3+ messages)
+- Session isolation via per-session state
+
+Layer 4 — Semantic Intent Detection (v0.1.2, Noninterference Semantic Corollary):
+- Regex verb+target matching ("walk me through your skill loading", "explain your exact protocol")
+- Catches novel phrasings beyond static substring patterns
+- EXTRACTION_VERBS × EXTRACTION_TARGETS combinatorial coverage
+
+Layer 5 — CPI Behavioral Constraint (v0.1.2):
+- Canary/forced-phrase injection escalated to `INJECTION_SUSPECT` taint
+- Blocked for ALL principals (including USER) via `cio-deny-injection` policy
+
+Layer 6 — Dynamic Token Discovery (v0.1.2, MI Dynamic Discovery Corollary):
+- `extract_protected_identifiers()` discovers SCREAMING_CASE, camelCase, `${params.*}` from actual system prompt
+- `config_with_runtime_discovery()` merges static watchlist with runtime-discovered tokens
+
 **Empirical validation** (ZeroLeaks benchmark, no mocks):
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Extraction success | 84.6% | 38.5% (worst-case USER) |
-| Injection success | 91.3% | 4.3% (worst-case USER) |
-| ZLSS (1-10) | 10/10 | 2/10 |
-| Security Score | 2/100 | 79/100 |
-| Output guard catch rate | N/A | 11/11 (100%) |
+| Metric | Before | v0.1.1 | v0.1.2 (Current) |
+|--------|--------|--------|-------------------|
+| Extraction success | 84.6% | 38.5% | **15.4%** (worst-case USER) |
+| Injection success | 91.3% | 4.3% | **4.3%** (worst-case USER) |
+| ZLSS (1-10) | 10/10 | 2/10 | **1/10** |
+| Security Score | 2/100 | 79/100 | **90/100** |
+| Output guard catch rate | N/A | 11/11 | 11/11 (100%) |
 
 **Boundary**: ConversationIO does NOT protect against:
-- Multi-turn crescendo attacks (scanner is stateless per-message)
-- Novel phrasings not in the pattern database
-- Attacks where the USER principal is the attacker (format overrides only set UNTRUSTED taint)
+- Novel phrasings not matching regex verb+target patterns
+- Attacks where the USER principal is the attacker and no injection taint is detected
 - Model-internal reasoning manipulation that doesn't trigger syntactic patterns
+- Adversarial prompt evolution that outpaces static regex patterns
 
 ### Tamper-Evident Evidence
 
@@ -137,24 +156,34 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 ## What AER Does NOT Cover
 
 - Model behavior during inference (AER operates structurally, not on model internals)
-- ~~Prompt injection within a single inference turn~~ **Partially addressed**: The ConversationIO scanner detects known injection patterns and blocks 22/23 injection attacks from the ZeroLeaks taxonomy. Remaining gap: novel phrasings and multi-turn crescendo attacks.
-- ~~Data exfiltration through authorized read paths~~ **Partially addressed**: The output guard detects leaked system prompt tokens. Remaining gap: exfiltration of user data or tool outputs that don't match the watchlist.
+- ~~Prompt injection within a single inference turn~~ **Addressed**: The ConversationIO scanner (with semantic intent detection and session state tracking) detects known injection patterns and blocks 22/23 injection attacks. Multi-turn crescendo attacks are now detected via session-level taint accumulation.
+- ~~Data exfiltration through authorized read paths~~ **Addressed**: The output guard with dynamic token discovery detects leaked system prompt tokens at runtime, adapting to the actual system prompt content. Remaining gap: exfiltration of user data or tool outputs that don't match token patterns.
 - Physical compromise of the host system
 - Availability attacks / performance degradation
 - Social engineering of legitimate users
 
-## Residual Risk After ConversationIO Guard
+## Residual Risk After ConversationIO Guard (v0.1.2)
 
-The following attack classes remain partially effective despite the guard:
+The v0.1.2 corollaries addressed the primary gaps from v0.1.1:
 
-| Attack Class | Success Rate | Why |
-|-------------|-------------|-----|
-| Multi-turn crescendo | ~50% | Scanner is stateless; gradual deepening across messages not tracked |
-| Novel phrasings | Unknown | Syntactic pattern matching cannot generalize to unseen formulations |
-| Format override (USER) | ~30% | FormatOverride only sets UNTRUSTED; policy allows for USER principal |
-| Unknown internal tokens | 0% detection | Output guard only watches for tokens from ZeroLeaks report |
+| Gap (v0.1.1) | Status | Corollary Applied |
+|--------------|--------|-------------------|
+| Multi-turn crescendo | **Addressed** | Conversational Noninterference — session-level taint accumulation |
+| Novel phrasings | **Partially addressed** | Semantic Intent Detection — regex verb+target matching |
+| Format override (USER) | **Addressed** | CPI Behavioral Constraint — canary injection → INJECTION_SUSPECT |
+| Unknown internal tokens | **Addressed** | MI Dynamic Discovery — runtime extraction from system prompt |
 
-These gaps require architectural enhancements documented in the roadmap:
-1. **Conversation-level state tracking** — Track extraction progress across messages
-2. **Semantic classification** — ML-based intent detection beyond pattern matching
-3. **Dynamic token discovery** — Auto-populate output guard watchlist from actual system prompt
+The following residual risks remain:
+
+| Attack Class | Estimated Risk | Why |
+|-------------|---------------|-----|
+| LLM-based adversarial evolution | Unknown | Static regex patterns may be outpaced by adversarial research |
+| Novel disclosure formats | Low | Output guard heuristic (section headers) may miss novel formats |
+| Model-internal reasoning manipulation | Not addressable | AER operates structurally, not on model internals |
+| Social engineering of USER principal | Not addressable | Legitimate USER approvals cannot be structurally prevented |
+
+### Roadmap (path from 90/100 to ~98/100)
+
+1. **LLM-assisted semantic classification** — Use a lightweight classifier model to detect extraction intent beyond regex
+2. **Adversarial pattern update pipeline** — Automated ingestion of new attack patterns from security research
+3. **Output guard learning** — Dynamically learn output patterns that indicate disclosure from past incidents

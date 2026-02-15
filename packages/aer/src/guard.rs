@@ -250,7 +250,8 @@ impl Guard {
     }
 
     /// Evaluate an inbound message for prompt injection and extraction.
-    /// Scans the message content, applies taint from findings, and evaluates policy.
+    /// Scans the message content, applies taint from findings, evaluates
+    /// conversation-level state (crescendo detection), and evaluates policy.
     pub fn check_conversation_input(
         &self,
         principal: Principal,
@@ -261,8 +262,48 @@ impl Guard {
     ) -> io::Result<(GuardVerdict, crate::scanner::ScanResult, TypedRecord)> {
         let timer = EvalTimer::start(GuardSurface::ConversationIO);
 
-        // Run the scanner
-        let scan_result = crate::scanner::scan_input(content);
+        // Run the per-message scanner
+        let mut scan_result = crate::scanner::scan_input(content);
+
+        // Conversation-level state analysis (Conversational Noninterference Corollary)
+        // Detects crescendo attacks that distribute extraction intent across messages.
+        let conv_analysis = crate::conversation_state::analyze_in_context(
+            session_id, content, &scan_result,
+        );
+
+        if conv_analysis.crescendo_detected {
+            // Inject a synthetic ExtractionAttempt finding from session analysis
+            scan_result.findings.push(crate::scanner::ScanFinding {
+                category: crate::scanner::ScanCategory::ExtractionAttempt,
+                description: format!(
+                    "Crescendo attack detected via session analysis: {}",
+                    conv_analysis.rationale
+                ),
+                confidence: 0.90,
+                evidence: format!(
+                    "Accumulated score: {:.2}, extraction messages: {}",
+                    conv_analysis.accumulated_score,
+                    conv_analysis.extraction_message_count,
+                ),
+            });
+            // Escalate taint — crescendo probes carry UNTRUSTED at minimum
+            scan_result.taint_flags |= TaintFlags::UNTRUSTED.bits();
+
+            // Recompute verdict with the injected finding
+            scan_result.verdict = if scan_result.findings.iter().any(|f| {
+                matches!(
+                    f.category,
+                    crate::scanner::ScanCategory::SystemImpersonation
+                    | crate::scanner::ScanCategory::ExtractionAttempt
+                ) && f.confidence >= 0.9
+            }) {
+                crate::scanner::ScanVerdict::Block
+            } else if scan_result.findings.iter().filter(|f| f.confidence >= 0.75).count() >= 3 {
+                crate::scanner::ScanVerdict::Block
+            } else {
+                crate::scanner::ScanVerdict::Suspicious
+            };
+        }
 
         // Merge scanner taint with base taint
         let scanner_taint = TaintFlags::from_bits(scan_result.taint_flags)
@@ -274,7 +315,8 @@ impl Guard {
             crate::scanner::ScanVerdict::Block => (
                 GuardVerdict::Deny,
                 "scanner-block".to_string(),
-                format!("Scanner blocked: {} findings", scan_result.findings.len()),
+                format!("Scanner blocked: {} findings (crescendo: {})",
+                    scan_result.findings.len(), conv_analysis.crescendo_detected),
             ),
             _ => {
                 // Evaluate policy with combined taint

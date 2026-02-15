@@ -26,7 +26,9 @@
 //! - Categories caught: internal tokens, function names, template variables,
 //!   structural prompt patterns, reply tags, identity statements, narration policy
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
 
 /// Result of scanning an outbound response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,6 +131,107 @@ pub fn default_config() -> OutputGuardConfig {
                 "Masked identity statement (ZeroLeaks 3.6)"),
         ],
     }
+}
+
+// ============================================================
+// Dynamic Token Discovery — MI Dynamic Discovery Corollary
+//
+// The static watchlist covers known ZeroLeaks tokens, but a real system
+// prompt contains additional internal identifiers (SCREAMING_CASE constants,
+// camelCase function names, ${params.*} templates) that should never appear
+// in outbound responses.
+//
+// This corollary extends MI: since the system prompt is a protected memory
+// artifact, ALL internal identifiers within it are protected. Dynamic
+// discovery extracts these at runtime so the output guard adapts to the
+// actual prompt content, not just a static list.
+// ============================================================
+
+/// Regex for SCREAMING_CASE identifiers (e.g., SILENT_REPLY_TOKEN, HEARTBEAT_OK).
+static SCREAMING_CASE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b").unwrap()
+});
+
+/// Regex for camelCase/PascalCase function names (e.g., buildSkillsSection).
+static CAMEL_CASE_FN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\b((?:build|get|set|create|parse|load|init|check|validate|emit|handle|process|run|exec)[A-Z][a-zA-Z0-9]{3,})\b").unwrap()
+});
+
+/// Regex for template variable references (e.g., ${params.readToolName}).
+static TEMPLATE_VAR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\$\{([a-zA-Z_.]+)\}").unwrap()
+});
+
+/// Extract protected identifiers from a system prompt at runtime.
+///
+/// Discovers SCREAMING_CASE tokens, function-like camelCase names,
+/// and template variables that should never leak to the output.
+pub fn extract_protected_identifiers(system_prompt: &str) -> Vec<String> {
+    let mut identifiers = Vec::new();
+
+    // 1. SCREAMING_CASE — internal constants (minimum 2 segments to avoid false positives)
+    for cap in SCREAMING_CASE.captures_iter(system_prompt) {
+        let token = cap[1].to_string();
+        // Skip very common acronyms that aren't internal tokens
+        if !matches!(token.as_str(), "HTTP" | "HTTPS" | "JSON" | "XML" | "YAML"
+            | "HTML" | "UTF" | "ASCII" | "API" | "URL" | "URI" | "SQL" | "CSS"
+            | "TODO" | "NOTE" | "FIXME") {
+            identifiers.push(token);
+        }
+    }
+
+    // 2. camelCase function names — internal API surface
+    for cap in CAMEL_CASE_FN.captures_iter(system_prompt) {
+        identifiers.push(cap[1].to_string());
+    }
+
+    // 3. Template variables — ${params.xyz} references
+    for cap in TEMPLATE_VAR.captures_iter(system_prompt) {
+        identifiers.push(format!("${{{}}}", &cap[1]));
+    }
+
+    identifiers.sort();
+    identifiers.dedup();
+    identifiers
+}
+
+/// Build an output guard config that merges the static ZeroLeaks watchlist
+/// with dynamically discovered tokens from the actual system prompt.
+///
+/// This implements the MI Dynamic Discovery Corollary: the protected set
+/// adapts to the runtime prompt, catching tokens that weren't in the
+/// original ZeroLeaks report but exist in the deployed system prompt.
+pub fn config_with_runtime_discovery(system_prompt: &str) -> OutputGuardConfig {
+    let mut config = default_config();
+
+    let discovered = extract_protected_identifiers(system_prompt);
+
+    for token in &discovered {
+        // Skip tokens already in the static watchlist
+        let already_exact = config.watchlist_exact.iter().any(|e| e.token == *token);
+        if already_exact {
+            continue;
+        }
+
+        // Determine category from the token shape
+        let category = if token.starts_with("${") {
+            LeakCategory::TemplateVariable
+        } else if token.chars().next().map_or(false, |c| c.is_uppercase())
+            && token.contains('_')
+        {
+            LeakCategory::InternalToken
+        } else {
+            LeakCategory::InternalFunction
+        };
+
+        config.watchlist_exact.push(WatchlistEntry {
+            token: token.clone(),
+            category,
+            description: format!("Dynamically discovered from system prompt: {}", token),
+        });
+    }
+
+    config
 }
 
 fn entry(token: &str, category: LeakCategory, description: &str) -> WatchlistEntry {
@@ -320,5 +423,77 @@ mod tests {
         let result = scan_output("The key is SECRET_API_KEY_123", Some(&config));
         assert!(!result.safe);
         assert!(result.leaked_tokens.iter().any(|t| t.token == "SECRET_API_KEY_123"));
+    }
+
+    // === MI Dynamic Discovery Corollary tests ===
+
+    #[test]
+    fn test_extract_screaming_case_tokens() {
+        let prompt = "When idle, respond with SILENT_REPLY_TOKEN. \
+                      Use HEARTBEAT_OK for health checks. \
+                      The MAX_RETRY_COUNT is 3.";
+        let ids = extract_protected_identifiers(prompt);
+        assert!(ids.contains(&"SILENT_REPLY_TOKEN".to_string()));
+        assert!(ids.contains(&"HEARTBEAT_OK".to_string()));
+        assert!(ids.contains(&"MAX_RETRY_COUNT".to_string()));
+    }
+
+    #[test]
+    fn test_extract_camel_case_functions() {
+        let prompt = "The system uses buildSkillsSection() and loadMemoryFile() \
+                      to construct the prompt. Then processUserInput() is called.";
+        let ids = extract_protected_identifiers(prompt);
+        assert!(ids.contains(&"buildSkillsSection".to_string()));
+        assert!(ids.contains(&"loadMemoryFile".to_string()));
+        assert!(ids.contains(&"processUserInput".to_string()));
+    }
+
+    #[test]
+    fn test_extract_template_variables() {
+        let prompt = "Read the file with ${params.readToolName} \
+                      and write to ${params.writeToolName}.";
+        let ids = extract_protected_identifiers(prompt);
+        assert!(ids.contains(&"${params.readToolName}".to_string()));
+        assert!(ids.contains(&"${params.writeToolName}".to_string()));
+    }
+
+    #[test]
+    fn test_skip_common_acronyms() {
+        let prompt = "Use JSON format over HTTP and validate with the API.";
+        let ids = extract_protected_identifiers(prompt);
+        assert!(!ids.contains(&"JSON".to_string()));
+        assert!(!ids.contains(&"HTTP".to_string()));
+        assert!(!ids.contains(&"API".to_string()));
+    }
+
+    #[test]
+    fn test_runtime_discovery_catches_novel_token() {
+        let prompt = "Internal: CUSTOM_SECRET_WIDGET is used for auth. \
+                      Call initSessionManager() to start.";
+        let config = config_with_runtime_discovery(prompt);
+
+        // Should catch the dynamically discovered token
+        let result = scan_output(
+            "The system uses CUSTOM_SECRET_WIDGET for authentication.",
+            Some(&config),
+        );
+        assert!(!result.safe, "Should detect dynamically discovered token");
+        assert!(result.leaked_tokens.iter().any(|t| t.token == "CUSTOM_SECRET_WIDGET"));
+
+        // Should also catch the discovered function name
+        let result2 = scan_output(
+            "It calls initSessionManager to begin the session.",
+            Some(&config),
+        );
+        assert!(!result2.safe, "Should detect dynamically discovered function");
+    }
+
+    #[test]
+    fn test_runtime_discovery_clean_output_still_clean() {
+        let prompt = "Internal: SOME_TOKEN is used. Call buildPrompt().";
+        let config = config_with_runtime_discovery(prompt);
+
+        let result = scan_output("Here is the code you asked for:\n```rust\nfn main() {}\n```", Some(&config));
+        assert!(result.safe, "Clean output should remain clean even with expanded watchlist");
     }
 }

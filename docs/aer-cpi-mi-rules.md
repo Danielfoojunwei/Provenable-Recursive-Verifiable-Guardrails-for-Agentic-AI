@@ -131,15 +131,24 @@ Scans outbound LLM responses for leaked system prompt content:
 **Input**: `guard.check_conversation_input()` — scans before LLM processes the message
 **Output**: `guard.check_conversation_output()` — scans LLM response before delivery
 
+### Session-Level Defense (v0.1.2 — Four Corollaries)
+
+| Corollary | Theorem Basis | Implementation |
+|-----------|---------------|----------------|
+| Conversational Noninterference | Noninterference | `conversation_state.rs` — session-level taint accumulation, crescendo detection |
+| CPI Behavioral Constraint | CPI Theorem | `scanner.rs` — canary injection → `INJECTION_SUSPECT` taint |
+| MI Dynamic Token Discovery | MI Theorem | `output_guard.rs` — runtime watchlist from actual system prompt |
+| Semantic Intent Detection | Noninterference | `scanner.rs` — regex verb+target extraction intent matching |
+
 ### Empirical Results (ZeroLeaks Benchmark)
 
 ```
-Extraction: 3/13 blocked at input, 5/13 suspicious (tainted), 5/13 clean
+Extraction: 4/13 blocked at input, 7/13 suspicious (tainted), 2/13 clean
 Injection:  13/23 blocked at input, 9/23 suspicious (tainted), 1/23 clean
 Output:     11/11 leaked patterns caught, 0 false positives
 
-ZLSS:           10/10  →  2/10
-Security Score:  2/100 →  79/100
+ZLSS:           10/10  →  1/10
+Security Score:  2/100 →  90/100
 ```
 
 ## Reverse Proxy Trust Detection

@@ -4,6 +4,7 @@ pub mod bundle;
 pub mod canonical;
 pub mod cli;
 pub mod config;
+pub mod conversation_state;
 pub mod guard;
 pub mod hooks;
 pub mod metrics;

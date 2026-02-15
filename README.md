@@ -151,11 +151,18 @@ theorem. The table below shows the exact mapping:
 | `DurableMemory`    | MI Theorem            | `guard.check_memory_write()` — SOUL.md, AGENTS.md, etc. |
 | `ConversationIO`   | All four theorems     | `guard.check_conversation_input()` + `check_conversation_output()` |
 
-| Output Guard Layer  | Theorem               | What It Catches                       |
-|---------------------|-----------------------|---------------------------------------|
-| Token watchlist     | MI (read-side)        | Internal tokens (SILENT_REPLY_TOKEN, HEARTBEAT_OK, etc.) |
-| Structural patterns | MI + CPI              | Prompt structure disclosure (skill loading, reply tags, identity) |
-| Section heuristic   | MI                    | Multi-section prompt dumps (4+ section headers) |
+| Output Guard Layer          | Theorem                       | What It Catches                       |
+|-----------------------------|-------------------------------|---------------------------------------|
+| Token watchlist (static)    | MI (read-side)                | Internal tokens (SILENT_REPLY_TOKEN, HEARTBEAT_OK, etc.) |
+| Token watchlist (dynamic)   | MI Dynamic Discovery Corollary| Runtime-discovered SCREAMING_CASE, camelCase, `${params.*}` |
+| Structural patterns         | MI + CPI                      | Prompt structure disclosure (skill loading, reply tags, identity) |
+| Section heuristic           | MI                            | Multi-section prompt dumps (4+ section headers) |
+
+| Session-Level Defense           | Theorem Corollary               | What It Prevents                       |
+|---------------------------------|---------------------------------|----------------------------------------|
+| Conversation state tracker      | Conversational Noninterference  | Crescendo/multi-turn extraction across message sequences |
+| Canary injection escalation     | CPI Behavioral Constraint       | Forced-phrase injection denied for ALL principals |
+| Semantic intent detection       | Semantic Intent (Noninterference) | Novel extraction phrasings (verb + target regex matching) |
 
 ---
 
@@ -172,23 +179,23 @@ using real attack payloads through the real scanner and output guard code
 
 ### Results (Worst-Case: USER Principal, Input Scanner Only)
 
-| Metric                     | Before (No Guards) | After (ConversationIO Guard) |
-|----------------------------|--------------------|------------------------------|
-| Extraction Success Rate    | 84.6% (11/13)      | 38.5% (5/13)                 |
-| Injection Success Rate     | 91.3% (21/23)      | 4.3% (1/23)                  |
-| **ZLSS (1-10, lower=better)** | **10/10**       | **2/10**                     |
-| **Security Score (0-100)** | **2/100**           | **79/100**                   |
+| Metric                     | Before (No Guards) | v0.1.1 | v0.1.2 (Current) |
+|----------------------------|--------------------|--------|-------------------|
+| Extraction Success Rate    | 84.6% (11/13)      | 38.5%  | **15.4% (2/13)**  |
+| Injection Success Rate     | 91.3% (21/23)      | 4.3%   | **4.3% (1/23)**   |
+| **ZLSS (1-10, lower=better)** | **10/10**       | 2/10   | **1/10**          |
+| **Security Score (0-100)** | **2/100**           | 79/100 | **90/100**        |
 
 ### Layer-by-Layer Breakdown
 
-**Layer 1 — Input Scanner:**
+**Layer 1 — Input Scanner (with Semantic Intent + Session State):**
 
 | Attack Type | Blocked | Suspicious (Tainted) | Clean (Passed) |
 |-------------|---------|---------------------|----------------|
-| Extraction (13 attacks) | 3 | 5 | 5 |
+| Extraction (13 attacks) | 4 | 7 | 2 |
 | Injection (23 attacks) | 13 | 9 | 1 |
 
-**Layer 2 — Output Guard:**
+**Layer 2 — Output Guard (with Dynamic Token Discovery):**
 
 | Metric | Result |
 |--------|--------|
@@ -209,20 +216,28 @@ Discord bots, web interfaces, and API integrations):
 - **Injection success drops to 4.3%** (1/23 — only a bare canary word passes)
 - **Extraction**: all tainted messages blocked; output guard catches the rest
 
-### Honest Gaps
+### Gaps Addressed in v0.1.2 (Four Corollaries)
 
-These are the known limitations of the current implementation:
+The jump from 79/100 to 90/100 came from four **corollaries** to the existing
+theorems — no new theorems were needed:
 
-1. **Stateless scanner** — No cross-message state tracking. Crescendo/multi-turn
-   attacks that build gradually across messages are not detected by the scanner,
-   though the output guard catches leaked content.
-2. **FormatOverride is soft** — Only sets `UNTRUSTED` taint, not `INJECTION_SUSPECT`.
-   Allowed for USER principal by design (users legitimately request format changes).
-3. **Output guard uses known tokens** — Only catches tokens from the ZeroLeaks
-   report. Novel system prompts with different internal tokens need a custom
-   `OutputGuardConfig`.
-4. **Syntactic, not semantic** — Pattern matching detects known attack phrasings.
-   Novel phrasings that express the same intent may bypass detection.
+| Gap (v0.1.1)          | Corollary                              | Theorem Basis          | Implementation |
+|-----------------------|----------------------------------------|------------------------|----------------|
+| Stateless scanner     | Conversational Noninterference         | Noninterference        | `conversation_state.rs` — session-level taint accumulation with crescendo detection |
+| Canary injection soft | CPI Behavioral Constraint              | CPI Theorem            | `scanner.rs` — canary injection escalated to `INJECTION_SUSPECT` taint |
+| Static watchlist      | MI Dynamic Token Discovery             | MI Theorem             | `output_guard.rs` — runtime extraction of SCREAMING_CASE, camelCase, `${params.*}` from actual system prompt |
+| Brittle patterns      | Semantic Intent Detection              | Noninterference        | `scanner.rs` — regex verb+target analysis catches novel phrasings ("walk me through your skill loading") |
+
+### Remaining Honest Gaps
+
+1. **No LLM-based semantic understanding** — Regex intent detection only. Novel
+   attack phrasings not matching verb+target patterns may bypass detection.
+2. **Benchmark tests individual messages** — Multi-turn session detection is
+   implemented in `guard.rs` but not exercised by the per-message benchmark.
+3. **Adversarial prompt evolution** — Static regex patterns may be outpaced by
+   adversarial prompt engineering research.
+4. **Output guard heuristic** — Section header detection may miss novel disclosure
+   formats not matching the known header list.
 5. **No LLM in the loop** — Benchmark measures scanner/guard detection rates, not
    whether the LLM would comply with the attack. Actual success rates depend on
    model behavior.

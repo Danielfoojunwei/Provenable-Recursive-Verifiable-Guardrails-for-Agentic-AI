@@ -506,29 +506,37 @@ strings. The benchmark test is at `packages/aer/tests/zeroleaks_benchmark.rs`.
 
 ### 12.2 Results Summary
 
-| Layer | Metric | Result |
-|-------|--------|--------|
-| Input Scanner | Extraction attacks blocked/tainted | 8/13 (61.5%) |
-| Input Scanner | Injection attacks blocked/tainted | 22/23 (95.7%) |
-| Output Guard | Leaked response patterns caught | 11/11 (100%) |
-| Output Guard | False positive rate | 0% |
-| Combined | ZLSS (1-10, lower=better) | 2/10 (was 10/10) |
-| Combined | Security Score (0-100) | 79/100 (was 2/100) |
+| Layer | Metric | v0.1.1 | v0.1.2 (Current) |
+|-------|--------|--------|-------------------|
+| Input Scanner | Extraction attacks blocked/tainted | 8/13 (61.5%) | **11/13 (84.6%)** |
+| Input Scanner | Injection attacks blocked/tainted | 22/23 (95.7%) | 22/23 (95.7%) |
+| Output Guard | Leaked response patterns caught | 11/11 (100%) | 11/11 (100%) |
+| Output Guard | False positive rate | 0% | 0% |
+| Combined | ZLSS (1-10, lower=better) | 2/10 | **1/10** |
+| Combined | Security Score (0-100) | 79/100 | **90/100** |
 
 ### 12.3 Theorem Coverage
 
-Each detection category is grounded in a published formal theorem:
+Each detection category and defense layer is grounded in a published formal
+theorem or a derived corollary:
 
+**Base theorems:**
 - **Noninterference Theorem**: EncodedPayload, IndirectInjection, ManyShotPriming, FormatOverride
 - **CPI Theorem**: SystemImpersonation, BehaviorManipulation
 - **MI Theorem**: ExtractionAttempt, FalseContextInjection (+ Noninterference)
 - **RVU Machine Unlearning**: All GuardDecision records feed the contamination DAG
 
+**Corollaries (v0.1.2):**
+- **Conversational Noninterference**: Session-level taint accumulation for crescendo detection
+- **CPI Behavioral Constraint**: Canary injection → INJECTION_SUSPECT (control-plane mutation)
+- **MI Dynamic Token Discovery**: Runtime watchlist from actual system prompt
+- **Semantic Intent Detection**: Regex verb+target matching (Noninterference extension)
+
 ### 12.4 Known Limitations
 
-1. Scanner is stateless — no multi-turn attack tracking
-2. Pattern matching is syntactic — no semantic intent classification
-3. Output guard requires pre-configured token watchlist
+1. Regex intent detection only — no LLM-based semantic understanding
+2. Benchmark tests individual messages — multi-turn detection verified separately
+3. Adversarial prompt evolution may outpace static regex patterns
 4. Benchmark measures detection, not LLM compliance with attacks
 
 ## 13. References

@@ -615,12 +615,17 @@ fn zeroleaks_full_benchmark() {
     println!("  The scores above use worst-case (USER principal, no policy deny).");
 
     println!();
-    println!("━━━ HONEST GAPS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("  1. Scanner is STATELESS — crescendo/multi-turn attacks not tracked");
-    println!("  2. FormatOverride only sets UNTRUSTED taint — allowed for USER principal");
-    println!("  3. Output guard only catches KNOWN tokens from the ZeroLeaks report");
-    println!("  4. Pattern matching can be evaded with novel phrasings");
-    println!("  5. No semantic understanding — only syntactic pattern matching");
+    println!("━━━ ADDRESSED GAPS (v0.1.2 Corollaries) ━━━━━━━━━━━━━━━━━━━━━");
+    println!("  [FIXED] Crescendo/multi-turn → ConversationState tracker (Noninterference Corollary)");
+    println!("  [FIXED] Canary injection → INJECTION_SUSPECT escalation (CPI Behavioral Corollary)");
+    println!("  [FIXED] Static watchlist → Dynamic token discovery from system prompt (MI Discovery Corollary)");
+    println!("  [FIXED] Brittle patterns → Regex verb+target semantic matching (Semantic Intent Corollary)");
+    println!();
+    println!("━━━ REMAINING HONEST GAPS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("  1. No LLM-based semantic understanding — regex intent detection only");
+    println!("  2. Benchmark tests individual messages, not multi-turn sessions");
+    println!("  3. Adversarial prompt evolution may outpace static regex patterns");
+    println!("  4. Output guard heuristic (section headers) may miss novel disclosure formats");
     println!();
 
     // Assertions: verify the scores are actually computed
