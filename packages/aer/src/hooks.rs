@@ -296,6 +296,110 @@ pub fn check_proxy_trust(
     }
 }
 
+/// Hook: verify a skill package before installation (ClawHub/ClawHavoc defense).
+///
+/// This hook should be called BEFORE `on_control_plane_change("skills.install", ...)`.
+/// It scans the skill package for all known ClawHavoc attack vectors and returns
+/// Ok(Ok(record)) if safe, Ok(Err(record)) if denied.
+///
+/// The verification result is recorded as tamper-evident evidence regardless of verdict.
+pub fn on_skill_install(
+    principal: Principal,
+    taint: TaintFlags,
+    package: &crate::skill_verifier::SkillPackage,
+    existing_skills: &[&str],
+    popular_skills: &[&str],
+    parent_records: Vec<String>,
+) -> io::Result<Result<TypedRecord, TypedRecord>> {
+    let result = crate::skill_verifier::verify_skill_package(
+        package,
+        existing_skills,
+        popular_skills,
+    );
+
+    let verdict_str = match result.verdict {
+        crate::skill_verifier::SkillVerdict::Allow => "allow",
+        crate::skill_verifier::SkillVerdict::RequireApproval => "require_approval",
+        crate::skill_verifier::SkillVerdict::Deny => "deny",
+    };
+
+    let findings_json: Vec<serde_json::Value> = result.findings.iter().map(|f| {
+        json!({
+            "attack_vector": f.attack_vector,
+            "severity": format!("{:?}", f.severity),
+            "description": f.description,
+            "file": f.file,
+            "evidence": f.evidence,
+        })
+    }).collect();
+
+    let mut meta = RecordMeta::now();
+    meta.config_key = Some("skills.install".to_string());
+
+    let payload = json!({
+        "skill_verification": {
+            "skill_name": package.name,
+            "verdict": verdict_str,
+            "findings_count": result.findings.len(),
+            "findings": findings_json,
+            "name_collision": result.name_collision,
+            "name_similar_to": result.name_similar_to,
+        },
+    });
+
+    let record_taint = if result.verdict == crate::skill_verifier::SkillVerdict::Deny {
+        taint | TaintFlags::UNTRUSTED | TaintFlags::INJECTION_SUSPECT
+    } else if result.verdict == crate::skill_verifier::SkillVerdict::RequireApproval {
+        taint | TaintFlags::UNTRUSTED
+    } else {
+        taint
+    };
+
+    let record = records::emit_record(
+        RecordType::GuardDecision,
+        principal,
+        record_taint,
+        parent_records,
+        meta,
+        payload,
+    )?;
+    audit_chain::emit_audit(&record.record_id)?;
+
+    // Emit alert on denial
+    if result.verdict == crate::skill_verifier::SkillVerdict::Deny {
+        let detail = GuardDecisionDetail {
+            verdict: GuardVerdict::Deny,
+            rule_id: "skill-verify-deny".to_string(),
+            rationale: format!(
+                "Skill '{}' blocked: {} findings (max severity: {:?})",
+                package.name,
+                result.findings.len(),
+                result.findings.iter().map(|f| f.severity).max().unwrap_or(
+                    crate::skill_verifier::SkillFindingSeverity::Info
+                ),
+            ),
+            surface: GuardSurface::ControlPlane,
+            principal,
+            taint: record_taint,
+        };
+        let _ = alerts::emit_alert(
+            alerts::ThreatCategory::CpiViolation,
+            &detail,
+            &record.record_id,
+            &package.name,
+        );
+    }
+
+    match result.verdict {
+        crate::skill_verifier::SkillVerdict::Allow => Ok(Ok(record)),
+        crate::skill_verifier::SkillVerdict::RequireApproval => {
+            // Return Ok but the caller should prompt user for approval
+            Ok(Ok(record))
+        }
+        crate::skill_verifier::SkillVerdict::Deny => Ok(Err(record)),
+    }
+}
+
 /// Hook: scan an inbound user/channel message through the ConversationIO guard.
 /// Returns Ok(Ok(record)) if the message is allowed, Ok(Err(record)) if blocked.
 pub fn on_message_input(

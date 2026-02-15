@@ -86,6 +86,12 @@ Layer 6 — Dynamic Token Discovery (v0.1.2, MI Dynamic Discovery Corollary):
 - `extract_protected_identifiers()` discovers SCREAMING_CASE, camelCase, `${params.*}` from actual system prompt
 - `config_with_runtime_discovery()` merges static watchlist with runtime-discovered tokens
 
+Layer 7 — Pre-Install Skill Verification (v0.1.3, CPI + Noninterference):
+- `skill_verifier::verify_skill_package()` scans skill packages before installation
+- Detects all 6 ClawHavoc attack vectors: shell commands (V1), reverse shells (V2), credential exfiltration (V3), memory poisoning (V4), name collision (V5), typosquatting (V6)
+- `hooks::on_skill_install()` emits tamper-evident verification record
+- See [ClawHub Integration](clawhub-integration.md) for full analysis
+
 **Empirical validation** (ZeroLeaks benchmark, no mocks):
 
 | Metric | Before | v0.1.1 | v0.1.2 (Current) |

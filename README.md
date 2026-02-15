@@ -558,6 +558,7 @@ fuzz/                 # Fuzz testing targets
 | [Agent Integration Guide](docs/AGENT_INTEGRATION.md) | Step-by-step integration for AI agents and pipelines |
 | [AER Usage Guide](docs/aer-usage.md) | AER runtime operations (guards, snapshots, rollback) |
 | [CPI/MI Guard Rules](docs/aer-cpi-mi-rules.md) | Trust lattice, taint model, policy customization |
+| [ClawHub Integration](docs/clawhub-integration.md) | ClawHub marketplace integration & ClawHavoc prevention |
 
 ### Technical Reference
 

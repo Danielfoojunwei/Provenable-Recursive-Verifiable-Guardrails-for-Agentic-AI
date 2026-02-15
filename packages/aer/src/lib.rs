@@ -15,6 +15,7 @@ pub mod records;
 pub mod report;
 pub mod rollback;
 pub mod scanner;
+pub mod skill_verifier;
 pub mod snapshot;
 pub mod types;
 pub mod verify;

@@ -150,3 +150,14 @@ AER hooks into OpenClaw at these chokepoints:
 3. **Control-plane changes**: `hooks::on_control_plane_change()` — returns `Err` if denied
 4. **Memory writes**: `workspace::write_memory_file()` — returns `Err` if denied
 5. **Proxy trust detection**: `hooks::check_proxy_trust()` — emits audit warnings
+6. **Skill install verification**: `hooks::on_skill_install()` — pre-install skill scanning (v0.1.3)
+
+### ClawHub / Skill Marketplace Integration
+
+AER provides structural defense against supply-chain attacks on skill
+marketplaces like [ClawHub](https://clawhub.ai/). The `skill_verifier` module
+scans skill packages before installation for all 6 [ClawHavoc](https://www.esecurityplanet.com/threats/hundreds-of-malicious-skills-found-in-openclaws-clawhub/)
+attack vectors (shell commands, reverse shells, credential theft, memory
+poisoning, name collision, typosquatting).
+
+See [ClawHub Integration](clawhub-integration.md) for the full deep dive.

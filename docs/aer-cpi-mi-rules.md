@@ -151,6 +151,38 @@ ZLSS:           10/10  →  1/10
 Security Score:  2/100 →  90/100
 ```
 
+## Skill Supply Chain Verification (v0.1.3 — ClawHavoc Defense)
+
+### Surface
+
+Pre-install skill package verification (`hooks::on_skill_install()`).
+
+### ClawHavoc Attack Vectors Covered
+
+| Vector | Attack | Detection | Severity |
+|--------|--------|-----------|----------|
+| V1 | Social engineering (`curl \| bash`) | Shell execution pattern regex | Critical |
+| V2 | Reverse shell backdoor | Reverse shell pattern regex | Critical |
+| V3 | Credential exfiltration (`.env`, SSH keys) | Credential access + exfiltration patterns | High/Critical |
+| V4 | Memory poisoning (SOUL.md writes) | Memory file write pattern regex | Critical |
+| V5 | Skill precedence exploitation | Name collision against existing registry | High |
+| V6 | Typosquatting | Levenshtein distance ≤ 2 against popular skills | Medium |
+
+### Enforcement Point
+
+`hooks::on_skill_install()` must be called BEFORE `hooks::on_control_plane_change("skills.install", ...)`.
+The verifier emits a tamper-evident `GuardDecision` record with full findings.
+
+### Verdict Levels
+
+| Verdict | Condition | Action |
+|---------|-----------|--------|
+| `Allow` | No findings or Info-only | Proceed to CPI guard |
+| `RequireApproval` | Medium-severity findings | Prompt user for explicit approval |
+| `Deny` | High or Critical findings | Block installation |
+
+See [ClawHub Integration](clawhub-integration.md) for the full deep dive analysis.
+
 ## Reverse Proxy Trust Detection
 
 ### Surface

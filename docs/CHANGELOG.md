@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-02-15
+
+### Added
+
+- **ClawHub Integration & ClawHavoc Prevention** — Deep dive analysis mapping
+  all 6 ClawHavoc attack vectors (V1-V6) to specific AER structural defenses.
+  New `docs/clawhub-integration.md` with attack taxonomy, defense coverage
+  matrix, gap analysis, and integration architecture.
+- **Skill Verifier Module** (`skill_verifier.rs`) — Pre-install skill package
+  verification that scans for all 6 ClawHavoc attack vectors before a skill
+  enters the runtime:
+  - V1: Shell execution patterns (`curl | bash`, `pip install`, `sudo`)
+  - V2: Reverse shell backdoors (`/dev/tcp/`, `nc -e`, Python/Ruby/Perl sockets)
+  - V3: Credential exfiltration (`.clawdbot/.env`, `~/.ssh/`, API keys)
+  - V4: Memory poisoning (`open('SOUL.md', 'w')`, write to protected files)
+  - V5: Skill precedence exploitation (name collision detection)
+  - V6: Typosquatting (Levenshtein distance-based similarity detection)
+- **`hooks::on_skill_install()`** — New hook point for pre-install skill
+  verification, emits tamper-evident SkillVerification evidence record.
+- 16 new unit tests for skill verifier covering all attack vectors, false
+  positive resistance, and edge cases.
+- ClawHub integration referenced in README.md, threat model, and CPI/MI rules.
+
 ## [0.1.2] - 2026-02-15
 
 ### Added
