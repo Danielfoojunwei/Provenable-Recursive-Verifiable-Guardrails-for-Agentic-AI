@@ -1,0 +1,40 @@
+[package]
+name = "aegx"
+version = "0.1.0"
+edition = "2021"
+description = "AEGX v0.1 — Tamper-evident evidence bundle format for agentic AI"
+license = "MIT"
+
+[[bin]]
+name = "aegx"
+path = "src/bin/aegx.rs"
+
+[lib]
+name = "aegx"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
+zip = "2"
+jsonschema = "0.27"
+unicode-normalization = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
+proptest = "1"
+
+[[test]]
+name = "proptest_records"
+path = "fuzz/proptest_records.rs"
+
+[[test]]
+name = "proptest_bundles"
+path = "fuzz/proptest_bundles.rs"
