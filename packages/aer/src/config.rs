@@ -61,6 +61,10 @@ pub fn reports_dir() -> PathBuf {
     aer_root().join("reports")
 }
 
+pub fn alerts_dir() -> PathBuf {
+    aer_root().join("alerts")
+}
+
 /// Path to the records JSONL file.
 pub fn records_file() -> PathBuf {
     records_dir().join("records.jsonl")
@@ -103,6 +107,7 @@ pub fn ensure_aer_dirs() -> std::io::Result<()> {
         snapshots_dir(),
         bundles_dir(),
         reports_dir(),
+        alerts_dir(),
     ] {
         std::fs::create_dir_all(dir)?;
     }

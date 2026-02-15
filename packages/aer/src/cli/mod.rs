@@ -1,5 +1,6 @@
 pub mod bundle_cmd;
 pub mod init;
+pub mod prove_cmd;
 pub mod report_cmd;
 pub mod rollback_cmd;
 pub mod snapshot_cmd;
@@ -44,6 +45,27 @@ pub enum Commands {
     Report {
         /// Path to the bundle .aegx.zip file
         bundle_path: String,
+    },
+    /// Query what Provenable.ai has protected — the /prove interface
+    Prove {
+        /// Filter alerts since this ISO 8601 timestamp
+        #[arg(long)]
+        since: Option<String>,
+        /// Filter alerts until this ISO 8601 timestamp
+        #[arg(long)]
+        until: Option<String>,
+        /// Filter by threat category: CPI, MI, TAINT, PROXY, RATE_LIMIT, INJECTION
+        #[arg(long)]
+        category: Option<String>,
+        /// Minimum severity: INFO, MEDIUM, HIGH, CRITICAL
+        #[arg(long)]
+        severity: Option<String>,
+        /// Maximum number of alerts to return
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Output as JSON (for API/bot consumption)
+        #[arg(long)]
+        json: bool,
     },
     /// Show AER status
     Status,
@@ -94,6 +116,21 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         },
         Commands::Verify { bundle_path } => verify_cmd::run(&bundle_path)?,
         Commands::Report { bundle_path } => report_cmd::run(&bundle_path)?,
+        Commands::Prove {
+            since,
+            until,
+            category,
+            severity,
+            limit,
+            json,
+        } => prove_cmd::run(
+            since.as_deref(),
+            until.as_deref(),
+            category.as_deref(),
+            severity.as_deref(),
+            limit,
+            json,
+        )?,
         Commands::Status => status()?,
     }
 
@@ -123,6 +160,9 @@ fn status() -> Result<(), Box<dyn std::error::Error>> {
 
     let snapshots = crate::snapshot::list_snapshots()?;
     println!("Snapshots: {}", snapshots.len());
+
+    let alert_count = crate::alerts::alert_count()?;
+    println!("Threat alerts: {}", alert_count);
 
     // Verify chain integrity
     match crate::audit_chain::verify_chain()? {

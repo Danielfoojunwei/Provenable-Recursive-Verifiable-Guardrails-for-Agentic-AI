@@ -1,3 +1,4 @@
+use crate::alerts;
 use crate::audit_chain;
 use crate::canonical::sha256_hex;
 use crate::config;
@@ -285,6 +286,10 @@ pub fn check_proxy_trust(
             payload,
         )?;
         audit_chain::emit_audit(&record.record_id)?;
+
+        // Emit proxy misconfiguration alert
+        let _ = alerts::emit_proxy_alert(trusted_proxies, gateway_addr, &record.record_id);
+
         Ok(Some(record))
     } else {
         Ok(None)
