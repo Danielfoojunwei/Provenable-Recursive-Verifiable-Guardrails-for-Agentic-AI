@@ -1,21 +1,66 @@
-MIT License
+Provenable.ai Proprietary License
 
-Copyright (c) 2026 Daniel Foo Jun Wei
+Copyright (c) 2026 Daniel Foo Jun Wei / Provenable.ai. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+NOTICE: This software, including but not limited to the AEGX (Agent Evidence
+eXchange) file format specification, the AER (Agent Evidence & Recovery) runtime,
+all source code, documentation, schemas, and associated materials (collectively,
+the "Software"), is the proprietary and confidential intellectual property of
+Provenable.ai.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. GRANT OF LICENSE
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+   No license is granted under this notice. You may view this repository for
+   evaluation purposes only. Any use, reproduction, modification, distribution,
+   or creation of derivative works requires a separate written license agreement
+   from Provenable.ai.
+
+2. RESTRICTIONS
+
+   Without a separate written license agreement from Provenable.ai, you may NOT:
+
+   a) Use the Software for any commercial or production purpose;
+   b) Copy, modify, merge, or create derivative works of the Software;
+   c) Distribute, sublicense, sell, or otherwise transfer the Software;
+   d) Reverse-engineer, decompile, or disassemble any part of the Software;
+   e) Use the AEGX file format specification to create competing products or
+      compatible implementations;
+   f) Remove or alter any proprietary notices, labels, or marks on the Software.
+
+3. AEGX FORMAT PROPRIETARY NOTICE
+
+   The AEGX (Agent Evidence eXchange) format, including but not limited to:
+   - The AEGX v0.1 specification (docs/SPEC.md)
+   - The AEGX_CANON_0_1 canonicalization algorithm
+   - The .aegx and .aegx.zip file extensions and bundle structure
+   - The manifest, record, and audit-entry JSON schemas
+   - The content-addressing and hash-chain verification algorithms
+
+   are proprietary to Provenable.ai. Any implementation of the AEGX format
+   requires a license from Provenable.ai.
+
+4. TRADEMARKS
+
+   "Provenable.ai", "Proven", "PRV", "AEGX", "AER", and associated logos are
+   trademarks or pending trademarks of Provenable.ai. Use of these marks
+   requires prior written permission.
+
+5. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+6. LIMITATION OF LIABILITY
+
+   IN NO EVENT SHALL PROVENABLE.AI OR ITS CONTRIBUTORS BE LIABLE FOR ANY CLAIM,
+   DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+   OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE.
+
+7. CONTACT
+
+   For licensing inquiries, contact: licensing@provenable.ai
+   Website: https://provenable.ai
+
+This license supersedes any prior MIT or open-source license that may have
+been included with earlier versions of this software.

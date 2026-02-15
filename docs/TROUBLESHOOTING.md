@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Common errors, their causes, and fixes for both the `aegx` and `openclaw-aer` CLIs.
+Common errors, their causes, and fixes for both the `aegx` and `proven-aer` CLIs.
 
 ---
 
@@ -9,7 +9,7 @@ Common errors, their causes, and fixes for both the `aegx` and `openclaw-aer` CL
 1. [Build Errors](#1-build-errors)
 2. [aegx CLI Errors](#2-aegx-cli-errors)
 3. [Verification Failures](#3-verification-failures)
-4. [openclaw-aer Errors](#4-openclaw-aer-errors)
+4. [proven-aer Errors](#4-proven-aer-errors)
 5. [Snapshot and Rollback Issues](#5-snapshot-and-rollback-issues)
 6. [Bundle Export/Import Issues](#6-bundle-exportimport-issues)
 
@@ -181,16 +181,16 @@ aegx add-blob my_bundle /path/to/original/file
 
 ---
 
-## 4. openclaw-aer Errors
+## 4. proven-aer Errors
 
 ### `AER: not initialized`
 
-**Cause:** `openclaw-aer init` has not been run yet.
+**Cause:** `proven-aer init` has not been run yet.
 
 **Fix:**
 
 ```bash
-openclaw-aer init
+proven-aer init
 ```
 
 ### `Bundle not found: <path>`
@@ -200,7 +200,7 @@ openclaw-aer init
 **Fix:** Check the path. Use `ls` to find the correct bundle:
 
 ```bash
-ls ~/.openclaw/.aer/bundles/
+ls ~/.proven/.aer/bundles/
 ```
 
 ### `Invalid timestamp '<ts>': ...`
@@ -235,7 +235,7 @@ ls ~/.openclaw/.aer/bundles/
 **Fix:**
 
 ```bash
-openclaw-aer snapshot create "my-snapshot" --scope full
+proven-aer snapshot create "my-snapshot" --scope full
 ```
 
 ### Rollback reports "state already matches snapshot"

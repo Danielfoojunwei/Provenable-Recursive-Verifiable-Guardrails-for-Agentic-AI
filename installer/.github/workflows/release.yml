@@ -56,7 +56,7 @@ jobs:
 
       - name: Run smoke tests
         run: |
-          chmod +x install/install-openclaw-aer.sh scripts/smoke_install_unix.sh
+          chmod +x install/install-proven-aer.sh scripts/smoke_install_unix.sh
           bash scripts/smoke_install_unix.sh
 
   release:
@@ -83,18 +83,18 @@ jobs:
         with:
           name: "Installer v${{ steps.version.outputs.version }}"
           body: |
-            ## OpenClaw AER Installer v${{ steps.version.outputs.version }}
+            ## Provenable.ai AER Installer v${{ steps.version.outputs.version }}
 
             ### Quick Install
 
             **macOS / Linux:**
             ```bash
-            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/installer/install/install-openclaw-aer.sh | bash
+            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/installer/install/install-proven-aer.sh | bash
             ```
 
             **Windows (PowerShell):**
             ```powershell
-            irm https://raw.githubusercontent.com/${{ github.repository }}/main/installer/install/install-openclaw-aer.ps1 | iex
+            irm https://raw.githubusercontent.com/${{ github.repository }}/main/installer/install/install-proven-aer.ps1 | iex
             ```
 
             ### Verification
@@ -106,8 +106,8 @@ jobs:
             - `trustedProxies: []` (empty)
             - AER guardrails enabled
           files: |
-            installer/install/install-openclaw-aer.sh
-            installer/install/install-openclaw-aer.ps1
+            installer/install/install-proven-aer.sh
+            installer/install/install-proven-aer.ps1
             installer/manifest/manifest.json
             installer/checksums.txt
           draft: false

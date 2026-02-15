@@ -26,8 +26,8 @@ pub fn run(manifest_path: Option<String>) -> Result<(), String> {
     }
 
     let required_artifacts = [
-        "install-openclaw-aer.sh",
-        "install-openclaw-aer.ps1",
+        "install-proven-aer.sh",
+        "install-proven-aer.ps1",
     ];
     for name in &required_artifacts {
         match data.installer.artifacts.get(*name) {
@@ -42,20 +42,20 @@ pub fn run(manifest_path: Option<String>) -> Result<(), String> {
         }
     }
 
-    // --- openclaw section ---
-    if data.openclaw.install_mode != "npm" {
+    // --- proven section ---
+    if data.proven.install_mode != "npm" {
         return Err(format!(
             "Unsupported install_mode: {}",
-            data.openclaw.install_mode
+            data.proven.install_mode
         ));
     }
 
-    if data.openclaw.pinned_versions.is_empty() {
+    if data.proven.pinned_versions.is_empty() {
         return Err("pinned_versions must be a non-empty list".to_string());
     }
 
     let mut allowed_versions = std::collections::HashSet::new();
-    for entry in &data.openclaw.pinned_versions {
+    for entry in &data.proven.pinned_versions {
         if !manifest::is_semver(&entry.version) {
             return Err(format!("Invalid pinned version: {}", entry.version));
         }
@@ -70,24 +70,24 @@ pub fn run(manifest_path: Option<String>) -> Result<(), String> {
         }
     }
 
-    if !manifest::is_semver(&data.openclaw.default_version) {
+    if !manifest::is_semver(&data.proven.default_version) {
         return Err(format!(
             "Invalid default_version: {}",
-            data.openclaw.default_version
+            data.proven.default_version
         ));
     }
 
-    if !allowed_versions.contains(&data.openclaw.default_version) {
+    if !allowed_versions.contains(&data.proven.default_version) {
         return Err(format!(
             "default_version '{}' is not in allowed pinned_versions",
-            data.openclaw.default_version
+            data.proven.default_version
         ));
     }
 
     println!(
-        "OK: Manifest valid — installer v{}, default OpenClaw v{}, {} allowed version(s)",
+        "OK: Manifest valid — installer v{}, default Proven v{}, {} allowed version(s)",
         data.installer.version,
-        data.openclaw.default_version,
+        data.proven.default_version,
         allowed_versions.len()
     );
 

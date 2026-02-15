@@ -8,7 +8,7 @@ pub mod verify_cmd;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "openclaw-aer")]
+#[command(name = "proven-aer")]
 #[command(about = "Agent Evidence & Recovery (AER) — evidence bundles, CPI/MI guard, RVU rollback")]
 #[command(version = "0.1.0")]
 pub struct Cli {
@@ -18,7 +18,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Initialize AER in the current OpenClaw state directory
+    /// Initialize AER in the current Provenable.ai state directory
     Init,
     /// Snapshot management
     Snapshot {
@@ -104,7 +104,7 @@ fn status() -> Result<(), Box<dyn std::error::Error>> {
     let aer_root = crate::config::aer_root();
     if !aer_root.exists() {
         println!("AER: not initialized");
-        println!("Run `openclaw-aer init` to set up AER.");
+        println!("Run `proven-aer init` to set up AER.");
         return Ok(());
     }
 

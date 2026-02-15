@@ -9,23 +9,23 @@ cd packages/aer
 cargo build --release
 ```
 
-The binary is at `target/release/openclaw-aer`.
+The binary is at `target/release/proven-aer`.
 
 ## Environment
 
-AER respects the same environment variables as OpenClaw:
+AER uses the following environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OPENCLAW_STATE_DIR` | Root state directory | `~/.openclaw` |
-| `OPENCLAW_HOME` | Alternative to STATE_DIR | `~/.openclaw` |
+| `PRV_STATE_DIR` | Root state directory | `~/.proven` |
+| `PRV_HOME` | Alternative to STATE_DIR | `~/.proven` |
 
 AER stores its state under `<STATE_DIR>/.aer/`.
 
 ## Initialization
 
 ```bash
-openclaw-aer init
+proven-aer init
 ```
 
 This creates:
@@ -41,7 +41,7 @@ A default policy is installed with deny-by-default rules for CPI and MI.
 ## Status
 
 ```bash
-openclaw-aer status
+proven-aer status
 ```
 
 Shows record count, audit chain entries, snapshot count, and chain integrity.
@@ -52,25 +52,25 @@ Shows record count, audit chain entries, snapshot count, and chain integrity.
 
 ```bash
 # Full snapshot (control-plane + memory)
-openclaw-aer snapshot create my-snapshot
+proven-aer snapshot create my-snapshot
 
 # Control-plane only
-openclaw-aer snapshot create pre-upgrade --scope control-plane
+proven-aer snapshot create pre-upgrade --scope control-plane
 
 # Memory only
-openclaw-aer snapshot create clean-state --scope memory
+proven-aer snapshot create clean-state --scope memory
 ```
 
 ### List snapshots
 
 ```bash
-openclaw-aer snapshot list
+proven-aer snapshot list
 ```
 
 ## Rollback
 
 ```bash
-openclaw-aer rollback <snapshot-id>
+proven-aer rollback <snapshot-id>
 ```
 
 Rollback restores all files in the snapshot scope to their exact snapshotted content. A Rollback evidence record is emitted and the restored files are verified against snapshot hashes.
@@ -79,13 +79,13 @@ Rollback restores all files in the snapshot scope to their exact snapshotted con
 
 ```bash
 # Export all evidence
-openclaw-aer bundle export
+proven-aer bundle export
 
 # Filter by agent
-openclaw-aer bundle export --agent agent-123
+proven-aer bundle export --agent agent-123
 
 # Filter by time
-openclaw-aer bundle export --since 2025-01-01T00:00:00Z
+proven-aer bundle export --since 2025-01-01T00:00:00Z
 ```
 
 The bundle is saved as a `.aegx.zip` file under `<STATE_DIR>/.aer/bundles/`.
@@ -102,7 +102,7 @@ Bundle contents:
 ## Verification
 
 ```bash
-openclaw-aer verify <path-to-bundle.aegx.zip>
+proven-aer verify <path-to-bundle.aegx.zip>
 ```
 
 Checks:
@@ -114,7 +114,7 @@ Checks:
 ## Report
 
 ```bash
-openclaw-aer report <path-to-bundle.aegx.zip>
+proven-aer report <path-to-bundle.aegx.zip>
 ```
 
 Prints the evidence report (Markdown format) to stdout.
@@ -141,7 +141,7 @@ Available surfaces: `ControlPlane`, `DurableMemory`
 Available actions: `Allow`, `Deny`
 Available principals: `Sys`, `User`, `ToolAuth`, `ToolUnauth`, `Web`, `Skill`, `Channel`, `External`
 
-## Integration with OpenClaw
+## Integration with OpenClaw (and Compatible Agentic Systems)
 
 AER hooks into OpenClaw at these chokepoints:
 

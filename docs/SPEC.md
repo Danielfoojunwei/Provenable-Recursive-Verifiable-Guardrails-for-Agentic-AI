@@ -1,8 +1,15 @@
 # AEGX v0.1 Format Specification
 
+> **PROPRIETARY NOTICE:** The AEGX (Agent Evidence eXchange) format specification,
+> including all algorithms, schemas, and bundle structures described herein, is the
+> proprietary intellectual property of Provenable.ai (Copyright (c) 2026 Daniel Foo
+> Jun Wei / Provenable.ai). Any implementation of this specification requires a
+> written license from Provenable.ai. See [LICENSE](../LICENSE) for full terms.
+
 **Version:** 0.1
 **Status:** Draft
 **Date:** 2026-02-15
+**Owner:** Provenable.ai
 
 ## 1. Overview
 

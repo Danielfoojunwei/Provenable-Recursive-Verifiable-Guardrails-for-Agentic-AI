@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Smoke test for install-openclaw-aer.ps1
+    Smoke test for install-proven-aer.ps1
 .DESCRIPTION
     Verifies the installer script structure, manifest, security defaults,
     and Rust tooling without performing a full npm install.
@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
-$Installer = Join-Path $RepoRoot "install" "install-openclaw-aer.ps1"
+$Installer = Join-Path $RepoRoot "install" "install-proven-aer.ps1"
 $ToolsBin = Join-Path $RepoRoot "tools" "target" "debug" "installer-tools.exe"
 
 $Pass = 0
@@ -47,7 +47,7 @@ function Assert-Contains {
 }
 
 # ── Tests ─────────────────────────────────────────────────────────
-Write-Host "=== Smoke Test: install-openclaw-aer.ps1 ===" -ForegroundColor Cyan
+Write-Host "=== Smoke Test: install-proven-aer.ps1 ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Build Rust tools if needed

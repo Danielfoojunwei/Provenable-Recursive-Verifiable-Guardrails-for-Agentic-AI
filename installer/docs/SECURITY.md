@@ -2,7 +2,7 @@
 
 ## Security Defaults
 
-The OpenClaw AER installer applies the following security-safe defaults:
+The Provenable.ai AER installer applies the following security-safe defaults:
 
 | Setting | Default | Rationale |
 |---------|---------|-----------|
@@ -31,8 +31,8 @@ This prevents:
 
 All installer artifacts are checksummed with SHA-256:
 
-- `install-openclaw-aer.sh` — Unix installer
-- `install-openclaw-aer.ps1` — Windows installer
+- `install-proven-aer.sh` — Unix installer
+- `install-proven-aer.ps1` — Windows installer
 - `manifest.json` — Version manifest
 
 Checksums are stored in both `manifest.json` (for programmatic verification) and `checksums.txt` (for manual verification).
@@ -88,6 +88,6 @@ We aim to acknowledge reports within 48 hours and provide a fix within 7 days fo
 ### Out of Scope
 
 - Vulnerabilities in Node.js itself
-- Vulnerabilities in npm packages installed by OpenClaw
+- Vulnerabilities in npm packages installed by Proven
 - Physical access to the host machine
 - Compromise of the GitHub repository or npm registry

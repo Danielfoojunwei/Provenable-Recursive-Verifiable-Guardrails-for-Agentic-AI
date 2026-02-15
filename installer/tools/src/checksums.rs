@@ -8,12 +8,12 @@ pub fn run(repo_root_override: Option<String>) -> Result<(), String> {
 
     let artifacts: BTreeMap<&str, _> = BTreeMap::from([
         (
-            "install-openclaw-aer.sh",
-            repo_root.join("install").join("install-openclaw-aer.sh"),
+            "install-proven-aer.sh",
+            repo_root.join("install").join("install-proven-aer.sh"),
         ),
         (
-            "install-openclaw-aer.ps1",
-            repo_root.join("install").join("install-openclaw-aer.ps1"),
+            "install-proven-aer.ps1",
+            repo_root.join("install").join("install-proven-aer.ps1"),
         ),
     ]);
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# install-openclaw-aer.sh — Install OpenClaw AER on macOS / Linux
+# install-proven-aer.sh — Install Provenable.ai AER on macOS / Linux
 # MIT License — Copyright (c) 2026 Daniel Foo Jun Wei
 set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────────
 INSTALLER_VERSION="0.1.0"
-MANIFEST_URL="${OPENCLAW_MANIFEST_URL:-https://raw.githubusercontent.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI/main/installer/manifest/manifest.json}"
-INSTALL_DIR="${OPENCLAW_INSTALL_DIR:-$HOME/.openclaw}"
-SKIP_CHECKSUM="${OPENCLAW_SKIP_CHECKSUM:-false}"
+MANIFEST_URL="${PRV_MANIFEST_URL:-https://raw.githubusercontent.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI/main/installer/manifest/manifest.json}"
+INSTALL_DIR="${PRV_INSTALL_DIR:-$HOME/.proven}"
+SKIP_CHECKSUM="${PRV_SKIP_CHECKSUM:-false}"
 REQUESTED_VERSION=""
 NODE_MIN_MAJOR=22
 BIND_HOST="127.0.0.1"
@@ -30,20 +30,20 @@ fatal() { printf "${RED}ERROR${NC} %s\n" "$*" >&2; exit 1; }
 
 usage() {
   cat <<EOF
-Usage: install-openclaw-aer.sh [OPTIONS]
+Usage: install-proven-aer.sh [OPTIONS]
 
-Install OpenClaw with AER (Agent Evidence & Recovery) guardrails.
+Install Provenable.ai with AER (Agent Evidence & Recovery) guardrails.
 
 Options:
-  --version VER     Pin a specific OpenClaw version (X.Y.Z)
-  --install-dir DIR Installation directory (default: ~/.openclaw)
+  --version VER     Pin a specific Proven version (X.Y.Z)
+  --install-dir DIR Installation directory (default: ~/.proven)
   --skip-checksum   Skip SHA-256 manifest verification (NOT recommended)
   -h, --help        Show this help message
 
 Environment Variables:
-  OPENCLAW_MANIFEST_URL   Override manifest fetch URL
-  OPENCLAW_INSTALL_DIR    Override installation directory
-  OPENCLAW_SKIP_CHECKSUM  Set to "true" to skip checksums
+  PRV_MANIFEST_URL   Override manifest fetch URL
+  PRV_INSTALL_DIR    Override installation directory
+  PRV_SKIP_CHECKSUM  Set to "true" to skip checksums
 
 Security Defaults:
   - Binds to 127.0.0.1 only (no 0.0.0.0)
@@ -113,15 +113,15 @@ parse_manifest() {
 const fs = require('fs');
 const m = JSON.parse(fs.readFileSync('$MANIFEST_FILE', 'utf8'));
 const field = process.argv[1];
-if (field === 'default_version') console.log(m.openclaw.default_version);
-else if (field === 'install_mode') console.log(m.openclaw.install_mode);
+if (field === 'default_version') console.log(m.proven.default_version);
+else if (field === 'install_mode') console.log(m.proven.install_mode);
 else if (field === 'schema_version') console.log(m.schema_version);
 else if (field === 'allowed_versions') {
-  const vs = m.openclaw.pinned_versions.filter(e => e.allowed).map(e => e.version);
+  const vs = m.proven.pinned_versions.filter(e => e.allowed).map(e => e.version);
   console.log(vs.join(' '));
 } else if (field === 'engines_node_min') {
   const ver = process.argv[2];
-  const entry = m.openclaw.pinned_versions.find(e => e.version === ver);
+  const entry = m.proven.pinned_versions.find(e => e.version === ver);
   console.log(entry ? (entry.engines_node_min || '>=22.0.0') : '>=22.0.0');
 }
 " "$@"
@@ -166,12 +166,12 @@ ENGINES_NODE=$(parse_manifest engines_node_min "$TARGET_VERSION")
 ENGINES_MIN=$(echo "$ENGINES_NODE" | sed 's/^>=//')
 ENGINES_MAJOR=$(echo "$ENGINES_MIN" | cut -d. -f1)
 if [ "$NODE_MAJOR" -lt "$ENGINES_MAJOR" ]; then
-  fatal "OpenClaw $TARGET_VERSION requires Node.js >= $ENGINES_MIN (found $NODE_VERSION)"
+  fatal "Proven $TARGET_VERSION requires Node.js >= $ENGINES_MIN (found $NODE_VERSION)"
 fi
 
 # ── Checksum verification ─────────────────────────────────────────
 if [ "$SKIP_CHECKSUM" = "true" ]; then
-  warn "Checksum verification SKIPPED (--skip-checksum or OPENCLAW_SKIP_CHECKSUM=true)"
+  warn "Checksum verification SKIPPED (--skip-checksum or PRV_SKIP_CHECKSUM=true)"
   warn "This is NOT recommended for production use"
 else
   info "Manifest checksum verification will be performed after install"
@@ -181,19 +181,19 @@ fi
 info "Installing to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
-# ── Install OpenClaw via npm ──────────────────────────────────────
-info "Installing openclaw@$TARGET_VERSION via npm..."
-npm install --prefix "$INSTALL_DIR" "openclaw@$TARGET_VERSION" --save-exact 2>&1 | while IFS= read -r line; do
+# ── Install Proven via npm ────────────────────────────────────────
+info "Installing proven@$TARGET_VERSION via npm..."
+npm install --prefix "$INSTALL_DIR" "proven@$TARGET_VERSION" --save-exact 2>&1 | while IFS= read -r line; do
   printf "  %s\n" "$line"
 done
 
-if [ ! -d "$INSTALL_DIR/node_modules/openclaw" ]; then
-  fatal "npm install succeeded but openclaw module not found"
+if [ ! -d "$INSTALL_DIR/node_modules/proven" ]; then
+  fatal "npm install succeeded but proven module not found"
 fi
-ok "openclaw@$TARGET_VERSION installed"
+ok "proven@$TARGET_VERSION installed"
 
 # ── Verify installed version ─────────────────────────────────────
-INSTALLED_VERSION=$(node -e "console.log(require('$INSTALL_DIR/node_modules/openclaw/package.json').version)" 2>/dev/null || echo "unknown")
+INSTALLED_VERSION=$(node -e "console.log(require('$INSTALL_DIR/node_modules/proven/package.json').version)" 2>/dev/null || echo "unknown")
 if [ "$INSTALLED_VERSION" != "$TARGET_VERSION" ]; then
   fatal "Version mismatch: expected $TARGET_VERSION, got $INSTALLED_VERSION"
 fi
@@ -203,7 +203,7 @@ ok "Installed version verified: $INSTALLED_VERSION"
 CONFIG_DIR="$INSTALL_DIR/config"
 mkdir -p "$CONFIG_DIR"
 
-CONFIG_FILE="$CONFIG_DIR/openclaw.json"
+CONFIG_FILE="$CONFIG_DIR/proven.json"
 cat > "$CONFIG_FILE" <<CFGEOF
 {
   "version": "$TARGET_VERSION",
@@ -238,24 +238,24 @@ ok "AER state directory created at $AER_STATE"
 BIN_DIR="$INSTALL_DIR/bin"
 mkdir -p "$BIN_DIR"
 
-cat > "$BIN_DIR/openclaw" <<BINEOF
+cat > "$BIN_DIR/proven" <<BINEOF
 #!/usr/bin/env bash
-# OpenClaw wrapper — generated by install-openclaw-aer.sh
-export OPENCLAW_HOME="$INSTALL_DIR"
-export OPENCLAW_CONFIG="$CONFIG_FILE"
-export OPENCLAW_STATE_DIR="$AER_STATE"
-exec node "$INSTALL_DIR/node_modules/openclaw/bin/openclaw.js" "\$@"
+# Provenable.ai wrapper — generated by install-proven-aer.sh
+export PRV_HOME="$INSTALL_DIR"
+export PRV_CONFIG="$CONFIG_FILE"
+export PRV_STATE_DIR="$AER_STATE"
+exec node "$INSTALL_DIR/node_modules/proven/bin/proven.js" "\$@"
 BINEOF
-chmod +x "$BIN_DIR/openclaw"
+chmod +x "$BIN_DIR/proven"
 
-ok "Wrapper script created at $BIN_DIR/openclaw"
+ok "Wrapper script created at $BIN_DIR/proven"
 
 # ── Save install receipt ──────────────────────────────────────────
 RECEIPT_FILE="$INSTALL_DIR/.install-receipt.json"
 cat > "$RECEIPT_FILE" <<RCPTEOF
 {
   "installer_version": "$INSTALLER_VERSION",
-  "openclaw_version": "$TARGET_VERSION",
+  "proven_version": "$TARGET_VERSION",
   "node_version": "$NODE_VERSION",
   "install_dir": "$INSTALL_DIR",
   "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -272,11 +272,11 @@ ok "Install receipt saved to $RECEIPT_FILE"
 echo ""
 echo -e "${BOLD}Installation complete!${NC}"
 echo ""
-echo "  OpenClaw:  v$TARGET_VERSION"
+echo "  Proven:    v$TARGET_VERSION"
 echo "  Location:  $INSTALL_DIR"
 echo "  Config:    $CONFIG_FILE"
 echo "  AER State: $AER_STATE"
-echo "  Binary:    $BIN_DIR/openclaw"
+echo "  Binary:    $BIN_DIR/proven"
 echo ""
 echo "Add to your PATH:"
 echo "  export PATH=\"$BIN_DIR:\$PATH\""

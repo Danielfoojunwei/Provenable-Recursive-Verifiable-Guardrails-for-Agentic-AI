@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# smoke_install_unix.sh — Smoke test for install-openclaw-aer.sh
+# smoke_install_unix.sh — Smoke test for install-proven-aer.sh
 # Verifies the installer runs, creates expected structure, and applies security defaults.
 # All tooling is Rust-based (no Python dependency).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-INSTALLER="$REPO_ROOT/install/install-openclaw-aer.sh"
+INSTALLER="$REPO_ROOT/install/install-proven-aer.sh"
 TOOLS_BIN="$REPO_ROOT/tools/target/debug/installer-tools"
 
 PASS=0
@@ -31,9 +31,9 @@ assert_contains() {
 TMPDIR_TEST=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_TEST"' EXIT
 
-INSTALL_DIR="$TMPDIR_TEST/openclaw-test"
+INSTALL_DIR="$TMPDIR_TEST/proven-test"
 
-echo "=== Smoke Test: install-openclaw-aer.sh ==="
+echo "=== Smoke Test: install-proven-aer.sh ==="
 echo "Install dir: $INSTALL_DIR"
 echo ""
 

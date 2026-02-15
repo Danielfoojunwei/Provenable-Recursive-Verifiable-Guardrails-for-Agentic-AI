@@ -393,36 +393,36 @@ Verification: PASS
 
 ---
 
-# openclaw-aer CLI Reference
+# proven-aer CLI Reference
 
 The AER (Agent Evidence & Recovery) runtime manages CPI/MI guardrails, snapshots, rollback, and incident bundle export. Build it from `packages/aer/`:
 
 ```bash
 cd packages/aer
 cargo build --release --locked
-# Binary: target/release/openclaw-aer
+# Binary: target/release/proven-aer
 ```
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENCLAW_STATE_DIR` | — | Override the state directory entirely (highest priority) |
-| `OPENCLAW_HOME` | — | Set the OpenClaw home directory (second priority) |
-| `HOME` | `/tmp` | Used to derive default path `~/.openclaw` (fallback) |
+| `PRV_STATE_DIR` | — | Override the state directory entirely (highest priority) |
+| `PRV_HOME` | — | Set the Provenable.ai home directory (second priority) |
+| `HOME` | `/tmp` | Used to derive default path `~/.proven` (fallback) |
 
-**Precedence:** `OPENCLAW_STATE_DIR` > `OPENCLAW_HOME` > `$HOME/.openclaw`
+**Precedence:** `PRV_STATE_DIR` > `PRV_HOME` > `$HOME/.proven`
 
 ---
 
-## `openclaw-aer init`
+## `proven-aer init`
 
-Initialize the AER subsystem in the OpenClaw state directory.
+Initialize the AER subsystem in the Provenable.ai state directory.
 
 ### Usage
 
 ```bash
-openclaw-aer init
+proven-aer init
 ```
 
 No arguments.
@@ -430,7 +430,7 @@ No arguments.
 ### What It Creates
 
 ```
-~/.openclaw/.aer/
+~/.proven/.aer/
   policy/default.yaml       # deny-by-default CPI + MI rules
   records/records.jsonl     # event log
   records/blobs/            # blob store
@@ -449,22 +449,22 @@ No arguments.
 
 ---
 
-## `openclaw-aer status`
+## `proven-aer status`
 
 Show the current state of the AER subsystem.
 
 ### Usage
 
 ```bash
-openclaw-aer status
+proven-aer status
 ```
 
 ### Example Output (Initialized)
 
 ```
 AER: initialized
-State directory: /home/user/.openclaw
-AER root: /home/user/.openclaw/.aer
+State directory: /home/user/.proven
+AER root: /home/user/.proven/.aer
 Records: 42
 Audit chain entries: 42
 Snapshots: 3
@@ -475,19 +475,19 @@ Audit chain integrity: VALID
 
 ```
 AER: not initialized
-Run `openclaw-aer init` to initialize.
+Run `proven-aer init` to initialize.
 ```
 
 ---
 
-## `openclaw-aer snapshot create`
+## `proven-aer snapshot create`
 
 Capture the current state of control-plane files, memory files, or both.
 
 ### Usage
 
 ```bash
-openclaw-aer snapshot create <NAME> [--scope <SCOPE>]
+proven-aer snapshot create <NAME> [--scope <SCOPE>]
 ```
 
 ### Arguments
@@ -500,9 +500,9 @@ openclaw-aer snapshot create <NAME> [--scope <SCOPE>]
 ### Example
 
 ```bash
-openclaw-aer snapshot create "before-refactor" --scope full
-openclaw-aer snapshot create "cp-backup" --scope cp
-openclaw-aer snapshot create "mem-backup" --scope mem
+proven-aer snapshot create "before-refactor" --scope full
+proven-aer snapshot create "cp-backup" --scope cp
+proven-aer snapshot create "mem-backup" --scope mem
 ```
 
 ### Output
@@ -518,14 +518,14 @@ Snapshot created:
 
 ---
 
-## `openclaw-aer snapshot list`
+## `proven-aer snapshot list`
 
 List all snapshots.
 
 ### Usage
 
 ```bash
-openclaw-aer snapshot list
+proven-aer snapshot list
 ```
 
 ### Example Output
@@ -537,14 +537,14 @@ e5f6a7b8  cp-backup        ControlPlane    2 files  2026-02-15T11:00:00Z
 
 ---
 
-## `openclaw-aer rollback`
+## `proven-aer rollback`
 
 Restore files to the state captured in a snapshot.
 
 ### Usage
 
 ```bash
-openclaw-aer rollback <SNAPSHOT_ID>
+proven-aer rollback <SNAPSHOT_ID>
 ```
 
 ### Arguments
@@ -564,19 +564,19 @@ openclaw-aer rollback <SNAPSHOT_ID>
 ### Example
 
 ```bash
-openclaw-aer rollback a1b2c3d4
+proven-aer rollback a1b2c3d4
 ```
 
 ---
 
-## `openclaw-aer bundle export`
+## `proven-aer bundle export`
 
 Export an AEGX evidence bundle from the AER event log.
 
 ### Usage
 
 ```bash
-openclaw-aer bundle export [--agent <AGENT_ID>] [--since <ISO8601>]
+proven-aer bundle export [--agent <AGENT_ID>] [--since <ISO8601>]
 ```
 
 ### Arguments
@@ -589,8 +589,8 @@ openclaw-aer bundle export [--agent <AGENT_ID>] [--since <ISO8601>]
 ### Example
 
 ```bash
-openclaw-aer bundle export
-openclaw-aer bundle export --agent my-agent-v1 --since 2026-02-15T10:00:00Z
+proven-aer bundle export
+proven-aer bundle export --agent my-agent-v1 --since 2026-02-15T10:00:00Z
 ```
 
 ### Output
@@ -599,14 +599,14 @@ Path to the exported `.aegx.zip` file.
 
 ---
 
-## `openclaw-aer verify`
+## `proven-aer verify`
 
 Verify an exported AER evidence bundle.
 
 ### Usage
 
 ```bash
-openclaw-aer verify <BUNDLE_PATH>
+proven-aer verify <BUNDLE_PATH>
 ```
 
 ### Arguments
@@ -636,14 +636,14 @@ FAIL: Bundle integrity check failed.
 
 ---
 
-## `openclaw-aer report`
+## `proven-aer report`
 
 Generate or display a Markdown report from an evidence bundle.
 
 ### Usage
 
 ```bash
-openclaw-aer report <BUNDLE_PATH>
+proven-aer report <BUNDLE_PATH>
 ```
 
 ### Arguments
@@ -656,7 +656,7 @@ If the bundle already contains `report.md`, it is displayed. Otherwise a new rep
 
 ---
 
-## openclaw-aer Exit Codes
+## proven-aer Exit Codes
 
 | Code | Meaning |
 |------|---------|

@@ -27,7 +27,7 @@ aegx verify my_session.aegx
 aegx import my_session.aegx.zip /tmp/check && aegx verify /tmp/check
 
 # Verify an AER evidence bundle
-openclaw-aer verify incident.aegx.zip
+proven-aer verify incident.aegx.zip
 ```
 
 If the output is `Verification: PASS` and the exit code is `0`, the bundle is intact.
@@ -253,10 +253,10 @@ fi
 
 ## 5. Verifying AER Bundles
 
-AER bundles (`.aegx.zip` files exported by `openclaw-aer bundle export`) are verified with:
+AER bundles (`.aegx.zip` files exported by `proven-aer bundle export`) are verified with:
 
 ```bash
-openclaw-aer verify path/to/bundle.aegx.zip
+proven-aer verify path/to/bundle.aegx.zip
 ```
 
 This runs the same checks plus AER-specific validations:
