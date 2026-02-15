@@ -184,8 +184,14 @@ pub fn on_file_write(
 ) -> io::Result<Result<TypedRecord, TypedRecord>> {
     let content_hash = sha256_hex(content);
 
-    // Check if this is a memory file that needs MI guarding
-    let is_memory_file = config::MEMORY_FILES.iter().any(|f| file_path.ends_with(f));
+    // Check if this is a memory file that needs MI guarding.
+    // Use Path::file_name() for exact basename matching to prevent bypass
+    // via crafted paths like "/tmp/not-actually-SOUL.md".
+    let is_memory_file = std::path::Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|basename| config::MEMORY_FILES.contains(&basename))
+        .unwrap_or(false);
 
     if is_memory_file {
         let g = guard::Guard::load_default()?;

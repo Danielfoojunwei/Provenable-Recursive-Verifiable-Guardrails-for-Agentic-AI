@@ -5,6 +5,59 @@ use crate::records;
 use crate::types::*;
 use serde_json::json;
 use std::io;
+use std::sync::Mutex;
+use std::time::Instant;
+
+/// Maximum number of denied guard evaluations per window.
+const RATE_LIMIT_MAX_DENIALS: u64 = 100;
+
+/// Rate limit window duration in seconds.
+const RATE_LIMIT_WINDOW_SECS: u64 = 60;
+
+/// Global rate limiter state for guard denials.
+/// Tracks denied requests to detect log flooding attacks.
+static DENIAL_RATE_LIMITER: Mutex<Option<RateLimiterState>> = Mutex::new(None);
+
+struct RateLimiterState {
+    window_start: Instant,
+    denial_count: u64,
+}
+
+/// Check and update the denial rate limiter.
+/// Returns Err if the rate limit has been exceeded (possible log flooding attack).
+fn check_denial_rate_limit() -> io::Result<()> {
+    let mut lock = DENIAL_RATE_LIMITER
+        .lock()
+        .map_err(|_| io::Error::new(io::ErrorKind::Other, "rate limiter lock poisoned"))?;
+
+    let now = Instant::now();
+    let state = lock.get_or_insert_with(|| RateLimiterState {
+        window_start: now,
+        denial_count: 0,
+    });
+
+    // Reset window if expired
+    if now.duration_since(state.window_start).as_secs() >= RATE_LIMIT_WINDOW_SECS {
+        state.window_start = now;
+        state.denial_count = 0;
+    }
+
+    state.denial_count += 1;
+
+    if state.denial_count > RATE_LIMIT_MAX_DENIALS {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!(
+                "Guard denial rate limit exceeded: {} denials in {} seconds. \
+                 Possible log flooding attack. Further evaluations are blocked \
+                 until the window resets.",
+                state.denial_count, RATE_LIMIT_WINDOW_SECS
+            ),
+        ));
+    }
+
+    Ok(())
+}
 
 /// Guard context holds the loaded policy and provides enforcement.
 pub struct Guard {
@@ -30,6 +83,7 @@ impl Guard {
 
     /// Evaluate a control-plane change request.
     /// Returns the guard decision record and whether the change is allowed.
+    /// Denied requests are rate-limited to prevent log flooding attacks.
     pub fn check_control_plane(
         &self,
         principal: Principal,
@@ -46,6 +100,11 @@ impl Guard {
             taint,
             approved,
         );
+
+        // Rate-limit denied requests to prevent log flooding
+        if verdict == GuardVerdict::Deny {
+            check_denial_rate_limit()?;
+        }
 
         let detail = GuardDecisionDetail {
             verdict,
@@ -81,6 +140,7 @@ impl Guard {
 
     /// Evaluate a memory write request.
     /// Returns the guard decision record and whether the write is allowed.
+    /// Denied requests are rate-limited to prevent log flooding attacks.
     pub fn check_memory_write(
         &self,
         principal: Principal,
@@ -97,6 +157,11 @@ impl Guard {
             taint,
             approved,
         );
+
+        // Rate-limit denied requests to prevent log flooding
+        if verdict == GuardVerdict::Deny {
+            check_denial_rate_limit()?;
+        }
 
         let detail = GuardDecisionDetail {
             verdict,

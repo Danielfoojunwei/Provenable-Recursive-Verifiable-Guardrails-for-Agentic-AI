@@ -4,6 +4,12 @@ use std::path::PathBuf;
 /// 1. OPENCLAW_STATE_DIR env var
 /// 2. OPENCLAW_HOME env var + default subpath
 /// 3. ~/.openclaw
+///
+/// # Panics
+/// Panics if none of `OPENCLAW_STATE_DIR`, `OPENCLAW_HOME`, or `HOME` are set.
+/// Falling back to `/tmp` is a security risk on multi-user systems because
+/// `/tmp` is world-writable, allowing an attacker to pre-create a malicious
+/// policy directory.
 pub fn resolve_state_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("OPENCLAW_STATE_DIR") {
         return PathBuf::from(dir);
@@ -11,7 +17,13 @@ pub fn resolve_state_dir() -> PathBuf {
     if let Ok(home) = std::env::var("OPENCLAW_HOME") {
         return PathBuf::from(home);
     }
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let home = std::env::var("HOME").unwrap_or_else(|_| {
+        panic!(
+            "HOME environment variable is not set. \
+             AER refuses to run without HOME because falling back to /tmp \
+             is a security risk. Set HOME, OPENCLAW_HOME, or OPENCLAW_STATE_DIR."
+        )
+    });
     PathBuf::from(home).join(".openclaw")
 }
 
