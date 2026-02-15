@@ -6,6 +6,14 @@ Agent Evidence & Recovery (AER) provides **structural security guarantees** for 
 
 AER operates as a reference monitor at the chokepoints where control-plane mutations and memory writes occur. It does **not** rely on LLM behavior, prompt secrecy, or text-based defenses.
 
+### Why This Matters: Real-World Evidence
+
+**ClawHavoc (Feb 2026)**: 341 malicious skills discovered on ClawHub (OpenClaw's official marketplace, 3,286+ skills, 1.5M+ downloads). 335 from a single coordinated campaign delivering the Atomic macOS Stealer. Attack vectors included social engineering (`curl | bash` in SKILL.md), reverse shell backdoors, `.clawdbot/.env` credential exfiltration, and SOUL.md/MEMORY.md memory poisoning. Source: [eSecurity Planet](https://www.esecurityplanet.com/threats/hundreds-of-malicious-skills-found-in-openclaws-clawhub/)
+
+**ZeroLeaks Assessment**: Unprotected OpenClaw scored ZLSS 10/10 (worst), Security Score 2/100, with 84.6% extraction and 91.3% injection success across 36 attack vectors.
+
+AER addresses these with structural enforcement validated by 168 passing tests across 6 test suites.
+
 ## What AER Guarantees
 
 ### Control-Plane Integrity (CPI)
@@ -92,15 +100,17 @@ Layer 7 — Pre-Install Skill Verification (v0.1.3, CPI + Noninterference):
 - `hooks::on_skill_install()` emits tamper-evident verification record
 - See [ClawHub Integration](clawhub-integration.md) for full analysis
 
-**Empirical validation** (ZeroLeaks benchmark, no mocks):
+**Empirical validation** (ZeroLeaks benchmark, no mocks — `packages/aer/tests/zeroleaks_benchmark.rs`):
 
-| Metric | Before | v0.1.1 | v0.1.2 (Current) |
-|--------|--------|--------|-------------------|
-| Extraction success | 84.6% | 38.5% | **15.4%** (worst-case USER) |
-| Injection success | 91.3% | 4.3% | **4.3%** (worst-case USER) |
-| ZLSS (1-10) | 10/10 | 2/10 | **1/10** |
-| Security Score | 2/100 | 79/100 | **90/100** |
-| Output guard catch rate | N/A | 11/11 | 11/11 (100%) |
+| Metric | Before | v0.1.1 | v0.1.2 | v0.1.3 (Current) |
+|--------|--------|--------|--------|-------------------|
+| Extraction success | 84.6% | 38.5% | **15.4%** | **15.4%** (worst-case USER) |
+| Injection success | 91.3% | 4.3% | **4.3%** | **4.3%** (worst-case USER) |
+| ZLSS (1-10) | 10/10 | 2/10 | **1/10** | **1/10** |
+| Security Score | 2/100 | 79/100 | **90/100** | **90/100** |
+| Output guard catch rate | N/A | 11/11 | 11/11 | 11/11 (100%) |
+| ClawHavoc vectors detected | 0/6 | — | — | **6/6** |
+| Total tests passing | — | 114 | 152 | **168** |
 
 **Boundary**: ConversationIO does NOT protect against:
 - Novel phrasings not matching regex verb+target patterns
@@ -168,9 +178,9 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 - Availability attacks / performance degradation
 - Social engineering of legitimate users
 
-## Residual Risk After ConversationIO Guard (v0.1.2)
+## Residual Risk After Guards (v0.1.2 + v0.1.3)
 
-The v0.1.2 corollaries addressed the primary gaps from v0.1.1:
+### v0.1.2 — Conversation Guard Corollaries
 
 | Gap (v0.1.1) | Status | Corollary Applied |
 |--------------|--------|-------------------|
@@ -179,7 +189,18 @@ The v0.1.2 corollaries addressed the primary gaps from v0.1.1:
 | Format override (USER) | **Addressed** | CPI Behavioral Constraint — canary injection → INJECTION_SUSPECT |
 | Unknown internal tokens | **Addressed** | MI Dynamic Discovery — runtime extraction from system prompt |
 
-The following residual risks remain:
+### v0.1.3 — Supply-Chain Defense (ClawHavoc)
+
+| Gap | Status | Defense Applied |
+|-----|--------|----------------|
+| No pre-install skill scanning | **Addressed** | `skill_verifier.rs` — scans all code + SKILL.md for 6 attack vectors |
+| No name collision detection | **Addressed** | Case-insensitive registry comparison at install time |
+| No typosquatting detection | **Addressed** | Levenshtein distance ≤ 2 against popular skill names |
+| Memory poisoning by skills | **Already addressed (v0.1.0)** | MI guard blocks SKILL principal writes to all memory files |
+| No file-read guards | **Not yet addressed** | MI guards writes but not reads; requires `FileRead` guard surface |
+| No outbound network monitoring | **Not yet addressed** | AER is a reference monitor, not a network proxy |
+
+### Remaining Residual Risks
 
 | Attack Class | Estimated Risk | Why |
 |-------------|---------------|-----|
@@ -187,9 +208,13 @@ The following residual risks remain:
 | Novel disclosure formats | Low | Output guard heuristic (section headers) may miss novel formats |
 | Model-internal reasoning manipulation | Not addressable | AER operates structurally, not on model internals |
 | Social engineering of USER principal | Not addressable | Legitimate USER approvals cannot be structurally prevented |
+| File-read exfiltration | Medium | Skills can read `.env` / SSH keys if not sandboxed |
+| Outbound network exfiltration | Medium | Skills can POST data to external servers without AER knowing |
 
 ### Roadmap (path from 90/100 to ~98/100)
 
 1. **LLM-assisted semantic classification** — Use a lightweight classifier model to detect extraction intent beyond regex
 2. **Adversarial pattern update pipeline** — Automated ingestion of new attack patterns from security research
 3. **Output guard learning** — Dynamically learn output patterns that indicate disclosure from past incidents
+4. **FileRead guard surface** — Extend MI to guard reads of sensitive files (`.env`, SSH keys, credentials)
+5. **Sandbox integration guide** — Document recommended container/seccomp/AppArmor profiles for skill execution
