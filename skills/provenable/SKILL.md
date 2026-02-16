@@ -115,6 +115,24 @@ When AER denies an action:
 3. Do NOT retry the same action — the policy will deny it again
 4. Escalate to the user or choose an alternative path
 
+## Channel Integration (Telegram, WhatsApp, etc.)
+
+Messages from Telegram, WhatsApp, and other external channels are assigned `Principal::Channel` (trust level 0). This means:
+
+- **CPI**: All control-plane changes from channel messages are **DENIED** (skill installs, tool registrations, permission changes)
+- **MI**: All memory writes from channel messages are **DENIED** (SOUL.md, AGENTS.md, TOOLS.md, etc.)
+- **Audit**: Every channel session, message, and guard decision is recorded with full provenance
+
+Channel metadata is captured in session records:
+
+```bash
+# Session start from Telegram — channel="telegram"
+# Session start from WhatsApp — channel="whatsapp"
+# All channel messages use Principal::Channel (trust level 0)
+```
+
+For channel-specific configuration and security best practices, see `{baseDir}/references/channel-integration.md`.
+
 ## Reference Files
 
 - **Full CLI reference:** Read `{baseDir}/references/cli-reference.md`
@@ -122,6 +140,7 @@ When AER denies an action:
 - **CPI/MI guard policies:** Read `{baseDir}/references/guard-policies.md`
 - **Query patterns and examples:** Read `{baseDir}/references/query-patterns.md`
 - **Natural language query mapping:** Read `{baseDir}/references/chat-queries.md`
+- **Channel integration (Telegram, WhatsApp):** Read `{baseDir}/references/channel-integration.md`
 
 ## Common Chat Queries Mapped to Commands
 

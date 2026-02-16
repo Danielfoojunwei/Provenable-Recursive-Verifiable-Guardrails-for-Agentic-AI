@@ -6,7 +6,8 @@
   "license": "Proprietary",
   "permissions": ["shell", "filesystem"],
   "entry": "SKILL.md",
-  "tags": ["security", "guardrails", "audit", "verification", "ai-safety", "compliance"],
+  "tags": ["security", "guardrails", "audit", "verification", "ai-safety", "compliance", "telegram", "whatsapp"],
   "models": ["claude-*", "gpt-*", "gemini-*"],
+  "channels": ["telegram", "whatsapp", "discord", "slack"],
   "minOpenClawVersion": "2026.1.0"
 }
