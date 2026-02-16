@@ -376,6 +376,12 @@ impl Guard {
     }
 
     /// Scan an outbound LLM response for system prompt leakage.
+    ///
+    /// **v0.1.5**: When `config` is `None`, the guard now checks the
+    /// `system_prompt_registry` for a cached config built from dynamic
+    /// token discovery. This means dynamically discovered tokens are
+    /// used automatically once a system prompt has been registered via
+    /// `hooks::on_system_prompt_available()`.
     pub fn check_conversation_output(
         &self,
         content: &str,
@@ -385,7 +391,15 @@ impl Guard {
     ) -> io::Result<(bool, crate::output_guard::OutputScanResult, TypedRecord)> {
         let timer = EvalTimer::start(GuardSurface::ConversationIO);
 
-        let scan_result = crate::output_guard::scan_output(content, config);
+        // Fallback chain: explicit config > registry cache > static default
+        let registry_config = if config.is_none() {
+            crate::system_prompt_registry::get_cached_config()
+        } else {
+            None
+        };
+        let effective_config = config.or(registry_config.as_ref());
+
+        let scan_result = crate::output_guard::scan_output(content, effective_config);
 
         let verdict = if scan_result.safe {
             GuardVerdict::Allow

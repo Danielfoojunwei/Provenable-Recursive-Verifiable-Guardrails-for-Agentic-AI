@@ -704,3 +704,334 @@ pub fn on_message_output(
         Ok(Err(decision_record))
     }
 }
+
+// ============================================================
+// v0.1.5 Hooks — Remaining Known Limitations
+// ============================================================
+
+/// Hook: register a system prompt for dynamic output guard token discovery.
+///
+/// **v0.1.5**: Implements the MI Dynamic Discovery Corollary. When the host
+/// platform (OpenClaw or otherwise) makes the system prompt available, this
+/// hook extracts protected identifiers and caches them in the
+/// `system_prompt_registry`. Subsequent calls to `on_message_output()` will
+/// automatically use the dynamically discovered tokens.
+///
+/// Returns Ok(record) with the count of dynamically discovered tokens.
+pub fn on_system_prompt_available(
+    agent_id: &str,
+    session_id: &str,
+    system_prompt: &str,
+) -> io::Result<TypedRecord> {
+    let token_count = crate::system_prompt_registry::register_system_prompt(system_prompt);
+    let prompt_hash = crate::system_prompt_registry::prompt_hash()
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let mut meta = RecordMeta::now();
+    meta.agent_id = Some(agent_id.to_string());
+    meta.session_id = Some(session_id.to_string());
+    meta.config_key = Some("system_prompt.registered".to_string());
+
+    let payload = json!({
+        "event": "system_prompt_registered",
+        "prompt_hash": prompt_hash,
+        "dynamic_token_count": token_count,
+        "prompt_length": system_prompt.len(),
+    });
+
+    let record = records::emit_record(
+        RecordType::GuardDecision,
+        Principal::Sys,
+        TaintFlags::empty(),
+        vec![],
+        meta,
+        payload,
+    )?;
+    audit_chain::emit_audit(&record.record_id)?;
+
+    notif::notify(
+        notif::NotificationLevel::Info,
+        notif::NotificationSource::ConversationGuard,
+        format!(
+            "System prompt registered for dynamic output guard. \
+             {} tokens discovered, prompt hash: {}.",
+            token_count,
+            &prompt_hash[..prompt_hash.len().min(12)]
+        ),
+        Some(&record.record_id),
+        None,
+    );
+
+    Ok(record)
+}
+
+/// Hook: gate a file read through the file read guard.
+///
+/// **v0.1.5**: Extends the MI Theorem read-side to arbitrary files (not just
+/// workspace MEMORY_FILES). Sensitive files (`.env`, SSH keys, credentials)
+/// are denied for untrusted principals and tainted with SECRET_RISK.
+///
+/// Returns Ok(Ok(record)) if allowed, Ok(Err(record)) if denied.
+pub fn on_file_read(
+    agent_id: &str,
+    session_id: &str,
+    principal: Principal,
+    taint: TaintFlags,
+    file_path: &str,
+    parent_records: Vec<String>,
+) -> io::Result<Result<TypedRecord, TypedRecord>> {
+    let check = crate::file_read_guard::check_file_read(principal, taint, file_path, None);
+
+    let mut meta = RecordMeta::now();
+    meta.agent_id = Some(agent_id.to_string());
+    meta.session_id = Some(session_id.to_string());
+    meta.path = Some(file_path.to_string());
+
+    match check.verdict {
+        GuardVerdict::Allow => {
+            let payload = json!({
+                "event": "file_read",
+                "file_path": file_path,
+                "verdict": "allow",
+                "output_taint": check.output_taint.bits(),
+                "matched_pattern": check.matched_pattern,
+            });
+
+            let record = records::emit_record(
+                RecordType::FileRead,
+                principal,
+                check.output_taint,
+                parent_records,
+                meta,
+                payload,
+            )?;
+            audit_chain::emit_audit(&record.record_id)?;
+            Ok(Ok(record))
+        }
+        GuardVerdict::Deny => {
+            meta.rule_id = Some("fs-deny-sensitive".to_string());
+
+            let payload = json!({
+                "guard_decision": {
+                    "verdict": "Deny",
+                    "rule_id": "fs-deny-sensitive",
+                    "rationale": check.rationale,
+                    "surface": "FileSystem",
+                    "principal": format!("{:?}", principal),
+                    "taint": check.output_taint.bits(),
+                },
+                "file_path": file_path,
+                "matched_pattern": check.matched_pattern,
+            });
+
+            let record = records::emit_record(
+                RecordType::GuardDecision,
+                principal,
+                check.output_taint,
+                parent_records,
+                meta,
+                payload,
+            )?;
+            audit_chain::emit_audit(&record.record_id)?;
+
+            notif::notify(
+                notif::NotificationLevel::Error,
+                notif::NotificationSource::MiGuard,
+                format!(
+                    "File read DENIED: {:?} principal attempted to read sensitive file '{}'. {}",
+                    principal, file_path, check.rationale
+                ),
+                Some(&record.record_id),
+                Some("Untrusted principals cannot read sensitive files (.env, SSH keys, credentials)."),
+            );
+
+            Ok(Err(record))
+        }
+    }
+}
+
+/// Hook: gate an outbound network request through the network egress guard.
+///
+/// **v0.1.5**: Extends the Noninterference Theorem to the network boundary.
+/// Requests to known exfiltration services are denied. Domain allowlists
+/// restrict untrusted principals. Oversized payloads are flagged.
+///
+/// Returns Ok(Ok(record)) if allowed, Ok(Err(record)) if denied.
+pub fn on_outbound_request(
+    agent_id: &str,
+    session_id: &str,
+    principal: Principal,
+    taint: TaintFlags,
+    url: &str,
+    method: &str,
+    payload_size: usize,
+    parent_records: Vec<String>,
+) -> io::Result<Result<TypedRecord, TypedRecord>> {
+    let check = crate::network_guard::check_outbound_request(
+        principal, taint, url, method, payload_size, None,
+    );
+
+    let mut meta = RecordMeta::now();
+    meta.agent_id = Some(agent_id.to_string());
+    meta.session_id = Some(session_id.to_string());
+
+    let flags_json: Vec<serde_json::Value> = check
+        .flags
+        .iter()
+        .map(|f| json!({
+            "category": format!("{:?}", f.category),
+            "description": &f.description,
+        }))
+        .collect();
+
+    match check.verdict {
+        GuardVerdict::Allow => {
+            let payload = json!({
+                "event": "outbound_request",
+                "url": url,
+                "method": method,
+                "payload_size": payload_size,
+                "verdict": "allow",
+                "flags": flags_json,
+                "output_taint": check.output_taint.bits(),
+            });
+
+            let record = records::emit_record(
+                RecordType::ToolCall,
+                principal,
+                check.output_taint,
+                parent_records,
+                meta,
+                payload,
+            )?;
+            audit_chain::emit_audit(&record.record_id)?;
+            Ok(Ok(record))
+        }
+        GuardVerdict::Deny => {
+            meta.rule_id = Some("net-deny-egress".to_string());
+
+            let payload = json!({
+                "guard_decision": {
+                    "verdict": "Deny",
+                    "rule_id": "net-deny-egress",
+                    "rationale": check.rationale,
+                    "surface": "NetworkIO",
+                    "principal": format!("{:?}", principal),
+                    "taint": check.output_taint.bits(),
+                },
+                "url": url,
+                "method": method,
+                "payload_size": payload_size,
+                "flags": flags_json,
+            });
+
+            let record = records::emit_record(
+                RecordType::GuardDecision,
+                principal,
+                check.output_taint,
+                parent_records,
+                meta,
+                payload,
+            )?;
+            audit_chain::emit_audit(&record.record_id)?;
+
+            notif::notify(
+                notif::NotificationLevel::Error,
+                notif::NotificationSource::ConversationGuard,
+                format!(
+                    "Outbound {} request DENIED: {:?} principal attempted {} — {}",
+                    method, principal, url, check.rationale
+                ),
+                Some(&record.record_id),
+                Some("Request was blocked by the network egress guard."),
+            );
+
+            Ok(Err(record))
+        }
+    }
+}
+
+/// Hook: audit the OS sandbox environment on session start.
+///
+/// **v0.1.5**: Runs the sandbox audit and records the result as tamper-evident
+/// evidence. Emits alerts if the sandbox is insufficient.
+///
+/// Returns the audit result and the evidence record.
+pub fn on_sandbox_audit(
+    agent_id: &str,
+    session_id: &str,
+) -> io::Result<(crate::sandbox_audit::SandboxAuditResult, TypedRecord)> {
+    let audit = crate::sandbox_audit::audit_sandbox_environment();
+    let profile = crate::sandbox_audit::default_profile();
+    let violations = crate::sandbox_audit::evaluate_profile(&audit, &profile);
+
+    let mut meta = RecordMeta::now();
+    meta.agent_id = Some(agent_id.to_string());
+    meta.session_id = Some(session_id.to_string());
+    meta.config_key = Some("sandbox.audit".to_string());
+
+    let payload = json!({
+        "event": "sandbox_audit",
+        "compliance": format!("{}", audit.compliance),
+        "in_container": audit.in_container,
+        "seccomp_active": audit.seccomp_active,
+        "seccomp_mode": audit.seccomp_mode,
+        "namespaces": audit.namespaces,
+        "readonly_root": audit.readonly_root,
+        "resource_limits": audit.resource_limits,
+        "violations": violations,
+        "findings_count": audit.findings.len(),
+    });
+
+    let record = records::emit_record(
+        RecordType::GuardDecision,
+        Principal::Sys,
+        TaintFlags::empty(),
+        vec![],
+        meta,
+        payload,
+    )?;
+    audit_chain::emit_audit(&record.record_id)?;
+
+    // Emit notifications based on compliance level
+    match audit.compliance {
+        crate::sandbox_audit::SandboxCompliance::Full => {
+            notif::notify(
+                notif::NotificationLevel::Info,
+                notif::NotificationSource::System,
+                "Sandbox audit: FULL compliance. Container + seccomp + namespaces + readonly root.",
+                Some(&record.record_id),
+                None,
+            );
+        }
+        crate::sandbox_audit::SandboxCompliance::Partial => {
+            notif::notify(
+                notif::NotificationLevel::Warning,
+                notif::NotificationSource::System,
+                format!(
+                    "Sandbox audit: PARTIAL compliance. {} violation(s): {}",
+                    violations.len(),
+                    violations.join("; ")
+                ),
+                Some(&record.record_id),
+                Some("Consider adding missing sandbox layers for full protection."),
+            );
+        }
+        crate::sandbox_audit::SandboxCompliance::None => {
+            notif::notify(
+                notif::NotificationLevel::Critical,
+                notif::NotificationSource::System,
+                format!(
+                    "Sandbox audit: NO OS sandboxing detected. {} violation(s): {}. \
+                     Skills can execute arbitrary code without restriction.",
+                    violations.len(),
+                    violations.join("; ")
+                ),
+                Some(&record.record_id),
+                Some("Deploy in a container with seccomp filtering for production use."),
+            );
+        }
+    }
+
+    Ok((audit, record))
+}

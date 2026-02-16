@@ -134,6 +134,16 @@ pub enum ScanCategory {
     /// Theorem: Noninterference — format constraints manipulate the output channel,
     /// potentially enabling exfiltration or downstream taint bypass.
     FormatOverride,
+    /// Sensitive file content detected in tool output (v0.1.5).
+    /// Defense-in-depth for file read guard: catches leaked credentials
+    /// even when file reads aren't routed through the hook.
+    /// Theorem: MI (read-side) — sensitive data carries SECRET_RISK taint.
+    SensitiveFileContent,
+    /// Data exfiltration pattern detected (v0.1.5).
+    /// Catches tool calls that attempt to send data to external endpoints.
+    /// Theorem: Noninterference — trusted data should not flow to untrusted
+    /// external endpoints without taint tracking.
+    DataExfiltration,
 }
 
 impl std::fmt::Display for ScanCategory {
@@ -147,6 +157,8 @@ impl std::fmt::Display for ScanCategory {
             ScanCategory::BehaviorManipulation => write!(f, "BEHAVIOR_MANIPULATION"),
             ScanCategory::FalseContextInjection => write!(f, "FALSE_CONTEXT_INJECTION"),
             ScanCategory::FormatOverride => write!(f, "FORMAT_OVERRIDE"),
+            ScanCategory::SensitiveFileContent => write!(f, "SENSITIVE_FILE_CONTENT"),
+            ScanCategory::DataExfiltration => write!(f, "DATA_EXFILTRATION"),
         }
     }
 }
@@ -739,6 +751,13 @@ fn compute_taint_flags(findings: &[ScanFinding]) -> u32 {
                     flags |= TaintFlags::INJECTION_SUSPECT;
                 }
                 flags |= TaintFlags::UNTRUSTED;
+            }
+            ScanCategory::SensitiveFileContent => {
+                flags |= TaintFlags::SECRET_RISK;
+            }
+            ScanCategory::DataExfiltration => {
+                flags |= TaintFlags::UNTRUSTED;
+                flags |= TaintFlags::WEB_DERIVED;
             }
         }
     }
