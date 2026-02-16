@@ -213,7 +213,7 @@ proven-aer prove \
   [--json]
 ```
 
-Categories: CpiViolation, MiViolation, TaintBlock, ProxyMisconfig, RateLimitExceeded, InjectionSuspect
+Categories: CPI, MI, TAINT, PROXY, RATE_LIMIT, INJECTION
 
 Severities: INFO, MEDIUM, HIGH, CRITICAL
 

@@ -54,7 +54,7 @@ proven-aer prove --severity CRITICAL
 Filter by threat category and time range:
 
 ```bash
-proven-aer prove --category CpiViolation --since 2026-02-01T00:00:00Z
+proven-aer prove --category CPI --since 2026-02-01T00:00:00Z
 ```
 
 ## Check System Health
@@ -130,7 +130,7 @@ When AER denies an action:
 | "Am I protected?" | `proven-aer prove --json` |
 | "Any threats?" | `proven-aer prove --severity MEDIUM --limit 20` |
 | "Show critical alerts" | `proven-aer prove --severity CRITICAL` |
-| "What did the guard block?" | `proven-aer prove --category CpiViolation` |
+| "What did the guard block?" | `proven-aer prove --category CPI` |
 | "System health" | `proven-aer status` |
 | "Take a snapshot" | `proven-aer snapshot create "user-requested"` |
 | "List snapshots" | `proven-aer snapshot list` |

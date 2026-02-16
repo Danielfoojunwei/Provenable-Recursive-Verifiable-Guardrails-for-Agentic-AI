@@ -81,19 +81,19 @@ proven-aer prove --severity CRITICAL --json
 ### CPI violations in the last 24 hours
 
 ```bash
-proven-aer prove --category CpiViolation --since "$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)" --json
+proven-aer prove --category CPI --since "$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)" --json
 ```
 
 On macOS:
 
 ```bash
-proven-aer prove --category CpiViolation --since "$(date -u -v-24H +%Y-%m-%dT%H:%M:%SZ)" --json
+proven-aer prove --category CPI --since "$(date -u -v-24H +%Y-%m-%dT%H:%M:%SZ)" --json
 ```
 
 ### Memory integrity violations
 
 ```bash
-proven-aer prove --category MiViolation --json
+proven-aer prove --category MI --json
 ```
 
 ### Last 5 alerts of any kind

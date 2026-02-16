@@ -19,10 +19,10 @@ This file maps natural language questions to the exact commands and JSON paths t
 | "Any threats?" | `proven-aer prove --severity MEDIUM --limit 20 --json` | `.alerts` array |
 | "Show critical alerts" | `proven-aer prove --severity CRITICAL --json` | `.alerts` filtered to CRITICAL |
 | "Recent attacks" | `proven-aer prove --limit 10 --json` | `.alerts` last 10 |
-| "CPI violations" | `proven-aer prove --category CpiViolation --json` | `.alerts` + `.protection.cpi_violations_blocked` |
-| "Memory integrity issues" | `proven-aer prove --category MiViolation --json` | `.alerts` + `.protection.mi_violations_blocked` |
-| "Injection attempts" | `proven-aer prove --category InjectionSuspect --json` | `.alerts` with InjectionSuspect category |
-| "Proxy issues" | `proven-aer prove --category ProxyMisconfig --json` | `.alerts` + `.protection.proxy_misconfigs_detected` |
+| "CPI violations" | `proven-aer prove --category CPI --json` | `.alerts` + `.protection.cpi_violations_blocked` |
+| "Memory integrity issues" | `proven-aer prove --category MI --json` | `.alerts` + `.protection.mi_violations_blocked` |
+| "Injection attempts" | `proven-aer prove --category INJECTION --json` | `.alerts` with InjectionSuspect category |
+| "Proxy issues" | `proven-aer prove --category PROXY --json` | `.alerts` + `.protection.proxy_misconfigs_detected` |
 
 ## System Health
 
