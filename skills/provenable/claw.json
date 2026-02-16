@@ -1,0 +1,13 @@
+{
+  "name": "provenable",
+  "version": "0.1.0",
+  "description": "Provable security guardrails for agentic AI — tamper-evident audit logs, CPI/MI enforcement, threat alerts, snapshots, rollback, and the /prove query interface",
+  "author": "Danielfoojunwei",
+  "license": "Proprietary",
+  "permissions": ["shell", "filesystem"],
+  "entry": "SKILL.md",
+  "tags": ["security", "guardrails", "audit", "verification", "ai-safety", "compliance", "telegram", "whatsapp"],
+  "models": ["claude-*", "gpt-*", "gemini-*"],
+  "channels": ["telegram", "whatsapp", "discord", "slack"],
+  "minOpenClawVersion": "2026.1.0"
+}
