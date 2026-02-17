@@ -63,6 +63,17 @@ This file maps natural language questions to the exact commands and JSON paths t
 | "Summarize bundle" | `aegx summarize <DIR>` | Record counts and verification |
 | "Generate audit report" | `proven-aer report <PATH>` | Markdown report |
 
+## Host Environment Queries (v0.1.6)
+
+| User says | Command | Response focus |
+|-----------|---------|----------------|
+| "Is my environment sandboxed?" | `proven-aer prove --json` | `.health` sandbox compliance |
+| "Any file read blocks?" | `proven-aer prove --category MI --json` | File read guard denials in `.alerts` |
+| "Any exfil attempts?" | `proven-aer prove --category INJECTION --json` | Network egress denials + DataExfiltration alerts |
+| "Was anything blocked from reading secrets?" | `proven-aer prove --json` | SensitiveFileRead alerts in `.alerts` |
+| "Network security" | `proven-aer prove --json` | NetworkExfiltration alerts + domain blocks |
+| "Sandbox status" | `proven-aer prove --json` | SandboxDeficiency alerts (if any) |
+
 ## Response Formatting Guidelines
 
 When answering protection queries:

@@ -115,6 +115,36 @@ When AER denies an action:
 3. Do NOT retry the same action — the policy will deny it again
 4. Escalate to the user or choose an alternative path
 
+## Host Environment Hardening (v0.1.6)
+
+AER v0.1.6 adds four new guard surfaces:
+
+### File Read Guard
+
+Blocks untrusted principals from reading sensitive files:
+- Denied: `.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`
+- Tainted: `.aws/*`, `.ssh/*`, `.gnupg/*` propagate `SECRET_RISK` to downstream derivations
+
+### Network Egress Monitor
+
+Evaluates outbound requests against domain blocklist/allowlist:
+- Blocked by default: `webhook.site`, `requestbin.com`, `pipedream.net`, `canarytokens.com`, `interact.sh`
+- When allowlist is non-empty, only listed domains are permitted
+
+### Sandbox Audit
+
+Verifies OS execution environment at session start:
+- Container detection (Docker, Kubernetes)
+- Seccomp filter status
+- Namespace isolation (PID, net, mnt, user)
+- Emits CRITICAL alert if no sandboxing detected
+
+### Dynamic Token Registry
+
+Caches system prompt tokens for output guard discovery:
+- SCREAMING_CASE tokens, camelCase identifiers, `${params.*}` template variables
+- Three-tier fallback: caller config → registry → static watchlist
+
 ## Channel Integration (Telegram, WhatsApp, etc.)
 
 Messages from Telegram, WhatsApp, and other external channels are assigned `Principal::Channel` (trust level 0). This means:
@@ -157,6 +187,9 @@ For channel-specific configuration and security best practices, see `{baseDir}/r
 | "Export evidence" | `proven-aer bundle export` |
 | "Verify this bundle" | `proven-aer verify <PATH>` |
 | "Guard performance" | `proven-aer prove --json` (check `.metrics`) |
+| "Is my environment sandboxed?" | `proven-aer prove --json` (check sandbox compliance in health) |
+| "Any file read blocks?" | `proven-aer prove --category MI --json` |
+| "Any exfil attempts?" | `proven-aer prove --category INJECTION --json` |
 
 ## Safety Rules
 

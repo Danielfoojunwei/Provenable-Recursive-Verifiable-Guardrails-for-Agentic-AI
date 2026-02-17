@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-02-17
+
+### Added
+
+- **System Prompt Registry** (`system_prompt_registry.rs`) — Singleton that
+  caches system prompt tokens for dynamic output guard discovery. Provides
+  `register_system_prompt()` and `register_tokens_only()` entry points.
+  `on_system_prompt_available()` hook activates discovery transparently.
+  Backward compatible — callers passing `None` fall back to static watchlist.
+- **File Read Guard** (`file_read_guard.rs`) — Sensitive file access control
+  with denied and tainted basename patterns. Default denied: `.env*`, `*.pem`,
+  `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`, `*.secret`, `.netrc`,
+  `.pgpass`. Default tainted: `.aws/*`, `.ssh/*`, `.gnupg/*`,
+  `.docker/config.json`, `*token*`, `*password*`. Integrated via
+  `hooks::on_file_read()`.
+- **Network Egress Monitor** (`network_guard.rs`) — Outbound request
+  evaluation with domain allowlist/blocklist, payload size limits, and
+  exfiltration heuristics. Default blocked domains: `webhook.site`,
+  `requestbin.com`, `pipedream.net`, `canarytokens.com`, `interact.sh`,
+  `burpcollaborator.net`. Integrated via `hooks::on_outbound_request()`.
+  `skill_verifier.rs` now detects hardcoded exfiltration URLs at install time.
+- **Sandbox Audit** (`sandbox_audit.rs`) — OS sandbox environment verification
+  at session start. Checks: container detection (`/.dockerenv`, cgroup),
+  seccomp status (`/proc/self/status`), namespace isolation (`/proc/self/ns/`),
+  read-only root filesystem, resource limits. Compliance levels: Full, Partial,
+  None. Integrated via `hooks::on_session_start()`. Emits `CRITICAL` alert if
+  no sandboxing detected.
+- **Scanner Categories**: `SensitiveFileContent` (defense-in-depth for leaked
+  credentials in tool output), `DataExfiltration` (suspicious URL patterns).
+- **Record Type**: `NetworkRequest` for outbound network call evidence.
+- New hooks: `on_system_prompt_available()`, `on_file_read()`,
+  `on_outbound_request()`.
+- Guard surfaces: `FileSystem`, `NetworkIO`, `SandboxCompliance`.
+- Total tests: 185 → **278 pass**.
+
+### Changed
+
+- `hooks::on_session_start()` now runs sandbox audit automatically and emits
+  compliance evidence.
+- `hooks::on_message_output()` uses `SystemPromptRegistry` when available,
+  falling back to static config.
+- `output_guard.rs` — `check_output()` now queries registry before caller
+  config before static default (three-tier fallback chain).
+- `prove::ProveResponse` version updated to `0.1.6`.
+
+### Theorem Gap Closures (v0.1.6)
+
+| Limitation | Theorem | Status | Fix |
+|-----------|---------|--------|-----|
+| Dynamic tokens never receive system prompt | MI Dynamic Discovery | **Addressed** | `SystemPromptRegistry` singleton with `on_system_prompt_available()` hook |
+| No file-read guards | MI (read-side) + Noninterference | **Addressed** | `FileReadGuard` with denied/tainted patterns, `on_file_read()` hook |
+| No outbound network monitoring | Noninterference + CPI | **Addressed** | `NetworkGuard` with domain blocklist/allowlist, `on_outbound_request()` hook |
+| No OS sandbox verification | CPI + RVU | **Addressed** | `SandboxAudit` with container/seccomp/namespace checks at session start |
+
 ## [0.1.5] - 2026-02-15
 
 ### Added

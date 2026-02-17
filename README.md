@@ -169,6 +169,39 @@ everything needed for independent, offline verification. No network access, no
 trust in the producer, no special software beyond the verifier. Bundles can be
 shared, archived, and audited by any party.
 
+### Outcome 8: Host Environment Hardening (v0.1.6)
+
+Four new guard surfaces close the remaining gaps between AER's policy
+enforcement and host-level security:
+
+1. **Dynamic Token Registry** — The `SystemPromptRegistry` singleton caches
+   system prompt tokens and activates runtime discovery in the output guard.
+   `config_with_runtime_discovery(system_prompt)` now receives the actual
+   prompt, catching SCREAMING_CASE, camelCase, and `${params.*}` tokens
+   dynamically. Backward compatible — callers passing `None` fall back to the
+   static watchlist.
+2. **File Read Guard** — `file_read_guard.rs` blocks untrusted principals from
+   reading sensitive files (`.env`, `*.pem`, `*.key`, `id_rsa*`, `credentials`).
+   Reads of files in `.aws/`, `.ssh/`, `.gnupg/` propagate `SECRET_RISK` taint.
+   Defense in depth: the scanner's `SensitiveFileContent` category catches
+   leaked credentials in tool output even if the hook is bypassed.
+3. **Network Egress Monitor** — `network_guard.rs` evaluates outbound requests
+   against domain allowlists/blocklists and payload size limits. Blocked by
+   default: `webhook.site`, `requestbin.com`, `pipedream.net`,
+   `canarytokens.com`, `interact.sh`, `burpcollaborator.net`. The scanner's
+   `DataExfiltration` category detects suspicious URL patterns.
+   `skill_verifier.rs` now detects hardcoded exfiltration URLs at install time.
+4. **Sandbox Audit** — `sandbox_audit.rs` verifies the OS execution environment
+   at session start: container detection (`/.dockerenv`, cgroup), seccomp
+   status, namespace isolation, read-only root, resource limits. Emits
+   `CRITICAL` alert if no sandboxing is detected. Records compliance level
+   (Full/Partial/None) as tamper-evident evidence.
+
+**Concrete guarantee:** Every guard decision, file-read block, network denial,
+and sandbox audit result is recorded as tamper-evident evidence in the audit
+chain. The `/prove` endpoint surfaces all four new surfaces in protection
+reports and agent notifications.
+
 ---
 
 ## Formal Foundations
@@ -201,6 +234,9 @@ theorem. The table below shows the exact mapping:
 | `ControlPlane`     | CPI Theorem           | `guard.check_control_plane()` — skill/tool/permission mutations |
 | `DurableMemory`    | MI Theorem            | `guard.check_memory_write()` — SOUL.md, AGENTS.md, etc. |
 | `ConversationIO`   | All four theorems     | `guard.check_conversation_input()` + `check_conversation_output()` |
+| `FileSystem`       | MI (read-side) + NI | `guard.check_file_read()` — sensitive file access control |
+| `NetworkIO`        | Noninterference + CPI | `guard.check_outbound_request()` — egress domain/payload evaluation |
+| `SandboxCompliance`| CPI + RVU             | `sandbox_audit.audit_environment()` — OS sandbox verification |
 
 | Output Guard Layer          | Theorem                       | What It Catches                       |
 |-----------------------------|-------------------------------|---------------------------------------|
@@ -230,6 +266,15 @@ theorem. The table below shows the exact mapping:
 | Contamination scope computation    | RVU Machine Unlearning          | Transitive closure identifies all affected downstream records |
 | MI read-side taint tracking        | MI + Noninterference            | Untrusted readers get tainted provenance, preventing laundering |
 
+| Host Environment Hardening (v0.1.6)    | Theorem(s)                      | What It Provides                        |
+|----------------------------------------|---------------------------------|-----------------------------------------|
+| Dynamic Token Registry                 | MI Dynamic Discovery Corollary  | System prompt tokens cached → output guard catches runtime-specific leaks |
+| File Read Guard                        | MI (read-side) + Noninterference | Sensitive file reads blocked/tainted for untrusted principals |
+| Network Egress Monitor                 | Noninterference + CPI           | Outbound exfiltration blocked; skill verifier detects hardcoded exfil URLs |
+| Sandbox Audit                          | CPI + RVU                       | Environment trustworthiness verified and recorded as evidence |
+| SensitiveFileContent scanner           | MI + Noninterference            | Leaked credentials caught in tool output (defense in depth) |
+| DataExfiltration scanner               | Noninterference                 | Suspicious URL patterns in tool output detected |
+
 ---
 
 ## Empirical Validation: ZeroLeaks Benchmark
@@ -249,7 +294,13 @@ our ConversationIO guard using the actual scanner and output guard code.
 | Supply-chain (ClawHavoc)   | 0/6 vectors blocked | —      | —         | **6/6** | 6/6 detected    |
 | Automated recovery         | None               | —      | —         | —     | **Auto-rollback + contamination scope** |
 | MI read-side taint         | None               | —      | —         | —     | **Reader principal tracked** |
-| Total tests                | —                  | 114    | 152       | 168   | **176 pass**      |
+| Total tests                | —                  | 114    | 152       | 168   | 176      |
+| **v0.1.6 (Current)** | | | | | |
+| File read guard        | None               | —      | —         | —     | **Sensitive reads blocked + tainted** |
+| Network egress monitor | None               | —      | —         | —     | **Domain blocklist + exfil detection** |
+| Sandbox audit          | None               | —      | —         | —     | **Container/seccomp/namespace verified** |
+| Dynamic token registry | None               | —      | —         | —     | **System prompt tokens cached at runtime** |
+| Total tests            | —                  | 114    | 152       | 168   | **278 pass**      |
 
 ### Layer-by-Layer Breakdown
 
@@ -323,6 +374,18 @@ Six theorem execution gaps were identified and fixed:
 | MI reads had clean provenance | MI/Noninterference | `read_memory_file()` tracks reader principal and applies taint |
 | Agent not notified of rollback events | All four | `/prove` includes `rollback_status.agent_messages` |
 
+### Gaps Addressed in v0.1.6 (Host Environment Hardening)
+
+Four implementation limitations identified in the architecture review have been
+addressed with new guard surfaces:
+
+| Limitation | Theorem | Fix |
+|-----------|---------|-----|
+| Output guard dynamic tokens never receive system prompt | MI Dynamic Discovery | `SystemPromptRegistry` singleton caches prompt; `on_system_prompt_available()` hook activates discovery |
+| No file-read guards for sensitive files | MI (read-side) + Noninterference | `FileReadGuard` with denied/tainted basename patterns; `on_file_read()` hook |
+| No outbound network monitoring | Noninterference + CPI | `NetworkGuard` with domain blocklist/allowlist; `on_outbound_request()` hook; skill verifier exfil URL detection |
+| No OS sandbox verification | CPI + RVU | `SandboxAudit` checks container/seccomp/namespace/readonly-root at session start; emits compliance evidence |
+
 ### Remaining Honest Gaps
 
 1. **No LLM-based semantic understanding** — Regex intent detection only. Novel
@@ -336,10 +399,8 @@ Six theorem execution gaps were identified and fixed:
 5. **No LLM in the loop** — Benchmark measures scanner/guard detection rates, not
    whether the LLM would comply with the attack. Actual success rates depend on
    model behavior.
-6. **No file-read guards** — MI guards writes but not reads of sensitive files.
-   A skill with filesystem access can still read `.env` files.
-7. **No outbound network monitoring** — AER is a reference monitor, not a network
-   proxy. Skills can POST exfiltrated data to external servers.
+6. ~~No file-read guards~~ — **Addressed (v0.1.6):** `FileReadGuard` blocks/taints sensitive file reads. Scanner `SensitiveFileContent` category catches leaked credentials.
+7. ~~No outbound network monitoring~~ — **Addressed (v0.1.6):** `NetworkGuard` provides domain blocklist/allowlist. Full enforcement requires OS-level egress proxy.
 
 ### How to Run the Benchmark
 
@@ -465,6 +526,12 @@ AER is the runtime subsystem that enforces structural security:
   rollback for control-plane state and workspace memory.
 - **Incident Bundle Export:** Exports self-contained `.aegx.zip` evidence
   bundles with independent verification tooling.
+- **File Read Guard (v0.1.6):** Blocks untrusted reads of sensitive files
+  (`.env`, SSH keys, credentials) and taints reads from sensitive directories.
+- **Network Egress Monitor (v0.1.6):** Evaluates outbound requests against
+  domain blocklists/allowlists with payload size limits and exfiltration detection.
+- **Sandbox Audit (v0.1.6):** Verifies OS-level sandboxing (container, seccomp,
+  namespaces) at session start, recording compliance as tamper-evident evidence.
 
 ### Trust Lattice
 
@@ -636,6 +703,11 @@ schemas/
 tests/
   test_vectors/       # Pre-built bundles for regression testing
 packages/aer/         # Agent Evidence & Recovery runtime subsystem
+packages/aer/src/
+  system_prompt_registry.rs  # v0.1.6: SystemPromptRegistry for dynamic token discovery
+  file_read_guard.rs         # v0.1.6: Sensitive file read access control
+  network_guard.rs           # v0.1.6: Outbound network request monitoring
+  sandbox_audit.rs           # v0.1.6: OS sandbox environment verification
 fuzz/                 # Fuzz testing targets
 ```
 

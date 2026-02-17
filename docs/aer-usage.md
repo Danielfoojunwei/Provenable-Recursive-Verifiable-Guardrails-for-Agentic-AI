@@ -137,7 +137,7 @@ rules:
     description: "Custom denial for web/skill principals"
 ```
 
-Available surfaces: `ControlPlane`, `DurableMemory`
+Available surfaces: `ControlPlane`, `DurableMemory`, `ConversationIO`, `FileSystem`, `NetworkIO`, `SandboxCompliance`
 Available actions: `Allow`, `Deny`
 Available principals: `Sys`, `User`, `ToolAuth`, `ToolUnauth`, `Web`, `Skill`, `Channel`, `External`
 
@@ -151,6 +151,10 @@ AER hooks into OpenClaw at these chokepoints:
 4. **Memory writes**: `workspace::write_memory_file()` — returns `Err` if denied
 5. **Proxy trust detection**: `hooks::check_proxy_trust()` — emits audit warnings
 6. **Skill install verification**: `hooks::on_skill_install()` — pre-install skill scanning (v0.1.3)
+7. **File read guard**: `hooks::on_file_read()` — sensitive file access control (v0.1.6)
+8. **Outbound network**: `hooks::on_outbound_request()` — egress domain/payload evaluation (v0.1.6)
+9. **Sandbox audit**: `hooks::on_session_start()` — OS sandbox verification at session start (v0.1.6)
+10. **System prompt registry**: `hooks::on_system_prompt_available()` — dynamic token discovery activation (v0.1.6)
 
 ### ClawHub / Skill Marketplace Integration
 

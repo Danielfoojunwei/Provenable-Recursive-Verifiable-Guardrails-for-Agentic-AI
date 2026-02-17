@@ -307,6 +307,75 @@ ls -la /path/to/parent/
 
 ---
 
+## 7. Guard Surface Errors (v0.1.6)
+
+### File read denied for sensitive file
+
+```
+GuardDecision: DENY — fs-deny-untrusted-sensitive
+  Principal: SKILL, Path: .env, Rule: fs-deny-untrusted-sensitive
+```
+
+**Cause:** An untrusted principal (SKILL, WEB, CHANNEL, EXTERNAL) attempted to
+read a sensitive file that matches the denied basename pattern.
+
+**This is expected behavior.** The File Read Guard blocks untrusted access to
+credential files. If the read is legitimate, the operation must be initiated by
+a USER or SYS principal.
+
+### Network request blocked
+
+```
+GuardDecision: DENY — net-deny-blocked-domain
+  Principal: SKILL, URL: https://webhook.site/abc123
+```
+
+**Cause:** An outbound request targeted a domain on the blocklist (known
+exfiltration services).
+
+**This is expected behavior.** If you need to reach a blocked domain
+legitimately, update the network guard policy to remove it from the blocklist
+or add it to the allowlist.
+
+### Sandbox audit — CRITICAL alert
+
+```
+CRITICAL: No OS-level sandboxing detected
+  Container: false, Seccomp: disabled, Namespaces: none
+  Compliance: None
+```
+
+**Cause:** AER detected that the execution environment has no sandbox
+protections. Skills can execute arbitrary code without containment.
+
+**Fix:** Run the agent inside a container with seccomp filtering:
+
+```bash
+# Docker with seccomp
+docker run --security-opt seccomp=default.json ...
+
+# Kubernetes with securityContext
+spec:
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+```
+
+### Dynamic token discovery not active
+
+If the output guard is only using the static watchlist and not discovering
+tokens from the system prompt, check that:
+
+1. `hooks::on_system_prompt_available()` was called with the system prompt
+2. The `SystemPromptRegistry` singleton was initialized
+3. The system prompt contains SCREAMING_CASE tokens, camelCase identifiers,
+   or `${params.*}` template variables
+
+This is a platform integration issue — the integration layer must call the
+hook when the system prompt becomes available.
+
+---
+
 ## Getting More Help
 
 - [Installation Guide](INSTALL.md) — build from source
