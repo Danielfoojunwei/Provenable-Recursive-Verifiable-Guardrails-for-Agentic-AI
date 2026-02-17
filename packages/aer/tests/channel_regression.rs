@@ -105,8 +105,8 @@ fn ch03_telegram_cpi_skill_install_denied() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
-    let session = hooks::on_session_start("tg-agent", "tg-sess", "telegram", None)
-        .expect("session start");
+    let session =
+        hooks::on_session_start("tg-agent", "tg-sess", "telegram", None).expect("session start");
 
     let result = hooks::on_control_plane_change(
         Principal::Channel,
@@ -138,8 +138,8 @@ fn ch04_whatsapp_cpi_tool_register_denied() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _tmp = setup();
 
-    let session = hooks::on_session_start("wa-agent", "wa-sess", "whatsapp", None)
-        .expect("session start");
+    let session =
+        hooks::on_session_start("wa-agent", "wa-sess", "whatsapp", None).expect("session start");
 
     let result = hooks::on_control_plane_change(
         Principal::Channel,
@@ -525,7 +525,10 @@ fn ch14_telegram_full_session_audit_trail() {
 
     // Verify audit chain integrity
     let chain_result = audit_chain::verify_chain().expect("verify chain");
-    assert!(chain_result.is_ok(), "Audit chain must be valid after full session");
+    assert!(
+        chain_result.is_ok(),
+        "Audit chain must be valid after full session"
+    );
 
     // Verify record types
     let types: Vec<RecordType> = all_records.iter().map(|r| r.record_type).collect();
@@ -579,7 +582,10 @@ fn ch15_telegram_session_evidence_bundle() {
         bundle::extract_bundle(std::path::Path::new(&bundle_path)).expect("extract bundle");
     let result = verify::verify_bundle(tmp_extract.path()).expect("verify bundle");
 
-    assert!(result.valid, "Bundle with Telegram events must verify as valid");
+    assert!(
+        result.valid,
+        "Bundle with Telegram events must verify as valid"
+    );
     assert!(
         result.record_count >= 3,
         "Bundle must contain at least 3 records (session + message + guard)"
@@ -663,7 +669,12 @@ fn ch16_prove_query_shows_channel_threats() {
     // Verify JSON formatting works
     let json_str = prove::format_prove_json(&response).expect("format json");
     let parsed: serde_json::Value = serde_json::from_str(&json_str).expect("parse json");
-    assert!(parsed["protection"]["total_threats_blocked"].as_u64().unwrap() >= 2);
+    assert!(
+        parsed["protection"]["total_threats_blocked"]
+            .as_u64()
+            .unwrap()
+            >= 2
+    );
 
     // Verify human-readable formatting works
     let human = prove::format_prove_response(&response);
@@ -800,8 +811,8 @@ fn ch19_multiple_channel_sessions_independent() {
     .expect("whatsapp message");
 
     // CLI session (trusted)
-    let cli_session = hooks::on_session_start("agent-multi", "cli-multi", "CLI", None)
-        .expect("cli session");
+    let cli_session =
+        hooks::on_session_start("agent-multi", "cli-multi", "CLI", None).expect("cli session");
 
     hooks::on_session_message(
         "agent-multi",
@@ -910,9 +921,8 @@ fn ch22_snapshot_rollback_survives_channel_attack() {
     fs::write(ws.join("SOUL.md"), b"I am trustworthy.").expect("write soul");
 
     // Snapshot before any channel interaction
-    let manifest =
-        aer::snapshot::create_snapshot("pre-telegram", SnapshotScope::DurableMemory)
-            .expect("create snapshot");
+    let manifest = aer::snapshot::create_snapshot("pre-telegram", SnapshotScope::DurableMemory)
+        .expect("create snapshot");
 
     // Channel attempts to poison memory (all denied)
     for file in config::MEMORY_FILES {
@@ -934,8 +944,7 @@ fn ch22_snapshot_rollback_survives_channel_attack() {
     fs::write(ws.join("SOUL.md"), b"ACCIDENTALLY CORRUPTED").expect("corrupt soul");
 
     // Rollback should restore
-    let report =
-        aer::rollback::rollback_to_snapshot(&manifest.snapshot_id).expect("rollback");
+    let report = aer::rollback::rollback_to_snapshot(&manifest.snapshot_id).expect("rollback");
     assert!(report.errors.is_empty(), "Rollback must succeed");
 
     let restored = fs::read_to_string(ws.join("SOUL.md")).expect("read restored");
@@ -999,16 +1008,10 @@ fn ch24_proxy_misconfig_relevant_to_channels() {
     let _tmp = setup();
 
     // Overly permissive proxy config allows anyone to spoof channel messages
-    let result = hooks::check_proxy_trust(
-        &["0.0.0.0/0".to_string()],
-        "0.0.0.0:18789",
-    )
-    .expect("proxy check");
+    let result =
+        hooks::check_proxy_trust(&["0.0.0.0/0".to_string()], "0.0.0.0:18789").expect("proxy check");
 
-    assert!(
-        result.is_some(),
-        "Overly permissive proxy must be detected"
-    );
+    assert!(result.is_some(), "Overly permissive proxy must be detected");
 
     let all_alerts = alerts::read_all_alerts().expect("read alerts");
     let proxy_alerts: Vec<_> = all_alerts
