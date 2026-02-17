@@ -136,10 +136,7 @@ pub fn emit_alert(
     let content = serde_json::to_string(&alert)?;
     let alert_id = crate::canonical::sha256_hex(content.as_bytes());
 
-    let alert = ThreatAlert {
-        alert_id,
-        ..alert
-    };
+    let alert = ThreatAlert { alert_id, ..alert };
 
     append_alert(&alert)?;
     Ok(alert)
@@ -268,9 +265,9 @@ pub fn alert_count() -> io::Result<u64> {
 fn classify_severity(category: ThreatCategory, decision: &GuardDecisionDetail) -> AlertSeverity {
     match category {
         ThreatCategory::CpiViolation => {
-            if decision.taint.contains(TaintFlags::INJECTION_SUSPECT) {
-                AlertSeverity::Critical
-            } else if decision.principal.trust_level() == 0 {
+            if decision.taint.contains(TaintFlags::INJECTION_SUSPECT)
+                || decision.principal.trust_level() == 0
+            {
                 AlertSeverity::Critical
             } else {
                 AlertSeverity::High
@@ -279,8 +276,6 @@ fn classify_severity(category: ThreatCategory, decision: &GuardDecisionDetail) -
         ThreatCategory::MiViolation => {
             if decision.taint.contains(TaintFlags::INJECTION_SUSPECT) {
                 AlertSeverity::Critical
-            } else if decision.taint.contains(TaintFlags::WEB_DERIVED) {
-                AlertSeverity::High
             } else {
                 AlertSeverity::High
             }
