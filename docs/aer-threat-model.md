@@ -12,7 +12,7 @@ AER operates as a reference monitor at the chokepoints where control-plane mutat
 
 **ZeroLeaks Assessment**: Unprotected OpenClaw scored ZLSS 10/10 (worst), Security Score 2/100, with 84.6% extraction and 91.3% injection success across 36 attack vectors.
 
-AER addresses these with structural enforcement validated by 168 passing tests across 6 test suites.
+AER addresses these with structural enforcement validated by 278 passing tests across 7 test suites.
 
 ## What AER Guarantees
 
@@ -100,19 +100,53 @@ Layer 7 — Pre-Install Skill Verification (v0.1.3, CPI + Noninterference):
 - `hooks::on_skill_install()` emits tamper-evident verification record
 - See [ClawHub Integration](clawhub-integration.md) for full analysis
 
+Layer 8 — File Read Guard (v0.1.6, MI read-side + Noninterference):
+- `file_read_guard.rs` blocks untrusted principals from reading sensitive files
+- Default denied basenames: `.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`, `*.secret`, `.netrc`, `.pgpass`
+- Default tainted directories: `.aws/*`, `.ssh/*`, `.gnupg/*`, `.docker/config.json`
+- `hooks::on_file_read()` evaluates reads, records with proper taint, feeds rollback policy
+- Defense in depth: scanner `SensitiveFileContent` category catches leaked credentials in tool output
+
+Layer 9 — Network Egress Monitor (v0.1.6, Noninterference + CPI):
+- `network_guard.rs` evaluates outbound requests against domain allowlist/blocklist
+- Default blocked domains: `webhook.site`, `requestbin.com`, `pipedream.net`, `canarytokens.com`, `interact.sh`, `burpcollaborator.net`
+- Payload size limits and exfiltration heuristics (base64 in query params)
+- `hooks::on_outbound_request()` evaluates domain/payload, records with taint
+- Scanner `DataExfiltration` category detects suspicious URL patterns in tool output
+- `skill_verifier.rs` detects hardcoded exfiltration URLs at install time
+
+Layer 10 — Sandbox Audit (v0.1.6, CPI + RVU):
+- `sandbox_audit.rs` verifies the OS execution environment at session start
+- Container detection: `/.dockerenv`, `/proc/1/cgroup`, `KUBERNETES_SERVICE_HOST`
+- Seccomp detection: `/proc/self/status` Seccomp line (disabled/strict/filter)
+- Namespace detection: `/proc/self/ns/` symlinks (pid, net, mnt, user)
+- Read-only root filesystem, resource limits parsing
+- Compliance levels: Full (container + seccomp + namespace), Partial, None
+- `hooks::on_session_start()` auto-runs audit, emits CRITICAL/HIGH alerts if insufficient
+
+Layer 11 — Dynamic Token Registry (v0.1.6, MI Dynamic Discovery Corollary):
+- `system_prompt_registry.rs` singleton caches system prompt tokens
+- `hooks::on_system_prompt_available()` activates discovery transparently
+- Output guard queries: caller config → registry → static default (three-tier fallback)
+- Backward compatible — callers passing `None` fall back to static watchlist
+
 **Empirical validation** (ZeroLeaks benchmark, no mocks — `packages/aer/tests/zeroleaks_benchmark.rs`):
 
-| Metric | Before | v0.1.1 | v0.1.2 | v0.1.3 | v0.1.4 (Current) |
-|--------|--------|--------|--------|--------|-------------------|
-| Extraction success | 84.6% | 38.5% | **15.4%** | 15.4% | **15.4%** (worst-case USER) |
-| Injection success | 91.3% | 4.3% | **4.3%** | 4.3% | **4.3%** (worst-case USER) |
-| ZLSS (1-10) | 10/10 | 2/10 | **1/10** | 1/10 | **1/10** |
-| Security Score | 2/100 | 79/100 | **90/100** | 90/100 | **90/100** |
-| Output guard catch rate | N/A | 11/11 | 11/11 | 11/11 | 11/11 (100%) |
-| ClawHavoc vectors detected | 0/6 | — | — | **6/6** | 6/6 |
-| Auto-recovery | None | — | — | — | **Auto-rollback + contamination scope** |
-| MI read-side taint | None | — | — | — | **Reader principal tracked** |
-| Total tests passing | — | 114 | 152 | 168 | **176** |
+| Metric | Before | v0.1.1 | v0.1.2 | v0.1.3 | v0.1.4 | v0.1.6 (Current) |
+|--------|--------|--------|--------|--------|--------|-------------------|
+| Extraction success | 84.6% | 38.5% | **15.4%** | 15.4% | 15.4% | **15.4%** (worst-case USER) |
+| Injection success | 91.3% | 4.3% | **4.3%** | 4.3% | 4.3% | **4.3%** (worst-case USER) |
+| ZLSS (1-10) | 10/10 | 2/10 | **1/10** | 1/10 | 1/10 | **1/10** |
+| Security Score | 2/100 | 79/100 | **90/100** | 90/100 | 90/100 | **90/100** |
+| Output guard catch rate | N/A | 11/11 | 11/11 | 11/11 | 11/11 | 11/11 (100%) |
+| ClawHavoc vectors detected | 0/6 | — | — | **6/6** | 6/6 | 6/6 |
+| Auto-recovery | None | — | — | — | Auto-rollback | **Auto-rollback + contamination scope** |
+| MI read-side taint | None | — | — | — | Reader tracked | **Reader principal tracked** |
+| File read guard | None | — | — | — | — | **Sensitive reads blocked + tainted** |
+| Network egress monitor | None | — | — | — | — | **Domain blocklist + exfil detection** |
+| Sandbox audit | None | — | — | — | — | **Container/seccomp/namespace verified** |
+| Dynamic token registry | None | — | — | — | — | **System prompt tokens cached** |
+| Total tests passing | — | 114 | 152 | 168 | 176 | **278** |
 
 **Boundary**: ConversationIO does NOT protect against:
 - Novel phrasings not matching regex verb+target patterns
@@ -187,7 +221,7 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 - Availability attacks / performance degradation
 - Social engineering of legitimate users
 
-## Residual Risk After Guards (v0.1.2 + v0.1.3 + v0.1.4)
+## Residual Risk After Guards (v0.1.2 + v0.1.3 + v0.1.4 + v0.1.6)
 
 ### v0.1.2 — Conversation Guard Corollaries
 
@@ -206,8 +240,8 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 | No name collision detection | **Addressed** | Case-insensitive registry comparison at install time |
 | No typosquatting detection | **Addressed** | Levenshtein distance ≤ 2 against popular skill names |
 | Memory poisoning by skills | **Already addressed (v0.1.0)** | MI guard blocks SKILL principal writes to all memory files |
-| No file-read guards | **Partially addressed (v0.1.4)** | MI reads now track reader principal and taint; full guard surface pending |
-| No outbound network monitoring | **Not yet addressed** | AER is a reference monitor, not a network proxy |
+| No file-read guards | **Addressed (v0.1.6)** | `FileReadGuard` blocks/taints sensitive file reads; scanner `SensitiveFileContent` catches leaked credentials |
+| No outbound network monitoring | **Addressed (v0.1.6)** | `NetworkGuard` domain blocklist/allowlist; `DataExfiltration` scanner; skill verifier exfil URL detection |
 
 ### v0.1.4 — Automated Recovery & Theorem Gap Closures
 
@@ -220,6 +254,15 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 | MI reads had clean provenance | **Addressed** | `read_memory_file()` tracks reader principal and applies taint |
 | Agent not notified of rollback | **Addressed** | `/prove` includes `rollback_status.agent_messages` |
 
+### v0.1.6 — Host Environment Hardening
+
+| Gap | Status | Fix Applied |
+|-----|--------|-------------|
+| Dynamic tokens never receive system prompt | **Addressed** | `SystemPromptRegistry` singleton with `on_system_prompt_available()` hook |
+| No file-read guards for sensitive files | **Addressed** | `FileReadGuard` with denied/tainted basename patterns; `on_file_read()` hook |
+| No outbound network monitoring | **Addressed** | `NetworkGuard` with domain blocklist/allowlist; `on_outbound_request()` hook; skill verifier exfil URL detection |
+| No OS sandbox verification | **Addressed** | `SandboxAudit` with container/seccomp/namespace checks at session start |
+
 ### Remaining Residual Risks
 
 | Attack Class | Estimated Risk | Why |
@@ -228,13 +271,16 @@ Taint flags propagate conservatively: if any parent is tainted, the output is ta
 | Novel disclosure formats | Low | Output guard heuristic (section headers) may miss novel formats |
 | Model-internal reasoning manipulation | Not addressable | AER operates structurally, not on model internals |
 | Social engineering of USER principal | Not addressable | Legitimate USER approvals cannot be structurally prevented |
-| File-read exfiltration | Medium | Skills can read `.env` / SSH keys if not sandboxed |
-| Outbound network exfiltration | Medium | Skills can POST data to external servers without AER knowing |
+| ~~File-read exfiltration~~ | ~~Medium~~ **Low** | **Addressed (v0.1.6):** `FileReadGuard` blocks/taints sensitive reads; scanner catches leaked credentials. Residual: skills with direct filesystem access bypassing hooks |
+| ~~Outbound network exfiltration~~ | ~~Medium~~ **Low** | **Addressed (v0.1.6):** `NetworkGuard` provides policy-layer blocklist. Residual: full enforcement requires OS-level egress proxy (squid, envoy, eBPF) |
+| Sandbox bypass | Low–Medium | `SandboxAudit` detects but cannot enforce sandboxing; container escape or seccomp bypass remains platform responsibility |
 
 ### Roadmap (path from 90/100 to ~98/100)
 
 1. **LLM-assisted semantic classification** — Use a lightweight classifier model to detect extraction intent beyond regex
 2. **Adversarial pattern update pipeline** — Automated ingestion of new attack patterns from security research
 3. **Output guard learning** — Dynamically learn output patterns that indicate disclosure from past incidents
-4. **FileRead guard surface** — Extend MI to guard reads of sensitive files (`.env`, SSH keys, credentials)
-5. **Sandbox integration guide** — Document recommended container/seccomp/AppArmor profiles for skill execution
+4. ~~**FileRead guard surface**~~ — **Done (v0.1.6):** `FileReadGuard` blocks/taints sensitive file reads for untrusted principals
+5. ~~**Sandbox integration guide**~~ — **Done (v0.1.6):** `SandboxAudit` verifies container/seccomp/namespace at session start; reference configs for squid, envoy, eBPF documented
+6. **OS-level egress proxy enforcement** — Integrate `NetworkGuard` policy with squid/envoy/eBPF for true network enforcement
+7. **Kernel-level seccomp profile generation** — Auto-generate seccomp profiles from skill manifests

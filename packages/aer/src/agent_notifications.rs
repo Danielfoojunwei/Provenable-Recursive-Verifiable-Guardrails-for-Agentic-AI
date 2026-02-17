@@ -371,9 +371,14 @@ pub fn notify_denial_policy(result: &crate::rollback_policy::DenialPolicyResult)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Serialize tests that share the global NOTIFICATIONS singleton.
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_notify_and_drain() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_notifications();
         notify(
             NotificationLevel::Info,
@@ -394,6 +399,7 @@ mod tests {
 
     #[test]
     fn test_peek_does_not_drain() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_notifications();
         notify(
             NotificationLevel::Warning,
@@ -409,6 +415,7 @@ mod tests {
 
     #[test]
     fn test_max_capacity() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_notifications();
         for i in 0..MAX_NOTIFICATIONS + 50 {
             notify(
@@ -427,6 +434,7 @@ mod tests {
 
     #[test]
     fn test_level_filtering() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_notifications();
         notify(NotificationLevel::Info, NotificationSource::System, "info", None, None);
         notify(NotificationLevel::Warning, NotificationSource::System, "warn", None, None);
@@ -457,6 +465,7 @@ mod tests {
 
     #[test]
     fn test_convenience_cpi_allowed() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_notifications();
         notify_cpi_allowed("skills.install", "User", Some("snap-123456789012"));
         let all = peek_notifications();
@@ -467,6 +476,7 @@ mod tests {
 
     #[test]
     fn test_convenience_cpi_denied() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_notifications();
         notify_cpi_denied("skills.install", "Web", "cpi-deny-untrusted", "record-1");
         let all = peek_notifications();
@@ -478,6 +488,7 @@ mod tests {
 
     #[test]
     fn test_convenience_output_blocked() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_notifications();
         notify_output_blocked(3, 2, "record-leak-1");
         let all = peek_notifications();

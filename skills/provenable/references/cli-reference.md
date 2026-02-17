@@ -38,7 +38,7 @@ aegx add-record <BUNDLE> \
 
 Prints the record ID to stdout.
 
-**Record types:** SessionStart, SessionMessage, ToolCall, ToolResult, FileRead, FileWrite, FileDelete, ControlPlaneChangeRequest, MemoryCommitRequest, GuardDecision, Snapshot, Rollback
+**Record types:** SessionStart, SessionMessage, ToolCall, ToolResult, FileRead, FileWrite, FileDelete, ControlPlaneChangeRequest, MemoryCommitRequest, GuardDecision, NetworkRequest, Snapshot, Rollback
 
 **Principals:** SYS, USER, WEB, TOOL, SKILL, CHANNEL, EXTERNAL
 

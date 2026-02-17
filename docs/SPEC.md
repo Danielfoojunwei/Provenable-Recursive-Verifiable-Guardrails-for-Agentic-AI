@@ -155,6 +155,7 @@ The `type` field MUST be one of the following values:
 | `GuardDecision`              | A CPI or MI guard's allow/deny decision.                        |
 | `Snapshot`                   | A verifiable snapshot of system state.                          |
 | `Rollback`                   | A rollback to a previously captured snapshot.                   |
+| `NetworkRequest`               | An outbound network request made by the agent or a tool.        |
 
 ### 4.4 Principals
 
@@ -517,7 +518,7 @@ strings. The benchmark test is at `packages/aer/tests/zeroleaks_benchmark.rs`.
 | Skill Verifier | ClawHavoc attack vectors detected | — | — | **6/6** | 6/6 |
 | Rollback Policy | Auto-recovery mechanisms | — | — | — | **3 (auto-snapshot, recommendation, auto-rollback)** |
 | MI Read-Side | Reader principal taint tracking | — | — | — | **Tracked** |
-| Test Suite | Total tests passing | 114 | 152 | 168 | **176** |
+| Test Suite | Total tests passing | 114 | 152 | 168 | **278** |
 
 ### 12.3 Theorem Coverage
 
@@ -548,14 +549,21 @@ theorem or a derived corollary:
 - **MI Read-Side Taint**: `read_memory_file()` now tracks reader principal; untrusted readers get tainted provenance (MI + Noninterference conservative-union)
 - **Agent Notification**: `/prove` includes `rollback_status.agent_messages` (all four theorems)
 
+**Host Environment Hardening (v0.1.6):**
+- **System Prompt Registry**: `SystemPromptRegistry` singleton caches system prompt tokens for dynamic output guard discovery (MI Dynamic Discovery Corollary)
+- **File Read Guard**: `FileReadGuard` blocks/taints sensitive file reads for untrusted principals (MI read-side + Noninterference)
+- **Network Egress Monitor**: `NetworkGuard` evaluates outbound requests against domain blocklist/allowlist (Noninterference + CPI)
+- **Sandbox Audit**: `SandboxAudit` verifies container/seccomp/namespace at session start (CPI + RVU)
+- **Scanner Extensions**: `SensitiveFileContent` and `DataExfiltration` categories (MI + Noninterference)
+
 ### 12.4 Known Limitations
 
 1. Regex intent detection only — no LLM-based semantic understanding
 2. Benchmark tests individual messages — multi-turn detection verified separately
 3. Adversarial prompt evolution may outpace static regex patterns
 4. Benchmark measures detection, not LLM compliance with attacks
-5. ~~No file-read guards~~ — Partially addressed (v0.1.4): MI reads now track reader principal and taint; full guard surface pending
-6. No outbound network monitoring — skills can POST data to external servers
+5. ~~No file-read guards~~ — **Addressed (v0.1.6):** `FileReadGuard` blocks/taints sensitive file reads; scanner `SensitiveFileContent` category catches leaked credentials
+6. ~~No outbound network monitoring~~ — **Addressed (v0.1.6):** `NetworkGuard` provides policy-layer domain blocklist/allowlist; full enforcement requires OS-level egress proxy
 7. Session state is in-memory only — server restart loses crescendo detection state
 8. Auto-rollback requires a prior snapshot to exist — if no snapshot was created, auto-rollback cannot execute
 

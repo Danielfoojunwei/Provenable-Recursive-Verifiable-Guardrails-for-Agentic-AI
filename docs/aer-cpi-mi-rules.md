@@ -183,6 +183,120 @@ The verifier emits a tamper-evident `GuardDecision` record with full findings.
 
 See [ClawHub Integration](clawhub-integration.md) for the full deep dive analysis.
 
+## File Read Guard (v0.1.6 — MI Read-Side + Noninterference)
+
+### Surface
+
+Sensitive file access control (`hooks::on_file_read()`).
+
+### Protected Patterns
+
+| Category | Default Patterns | Action |
+|----------|-----------------|--------|
+| **Denied basenames** | `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`, `*.secret`, `.netrc`, `.pgpass` | DENY — read blocked entirely |
+| **Tainted directories** | `.aws/*`, `.ssh/*`, `.gnupg/*`, `.docker/config.json`, `*token*`, `*password*` | ALLOW with `SECRET_RISK` taint propagated |
+
+### Default Policy Rules
+
+| Rule ID | Action | Condition | Description |
+|---------|--------|-----------|-------------|
+| `fs-deny-untrusted-sensitive` | DENY | principal in {Web, Skill, Channel, External} AND path matches denied pattern | Block untrusted reads of sensitive files |
+| `fs-taint-sensitive-dir` | ALLOW + taint | path matches tainted pattern | Allow read but propagate `SECRET_RISK` (0x08) taint |
+| `fs-allow-trusted` | ALLOW | principal in {User, Sys} | Trusted principals can read any file |
+
+### Enforcement Point
+
+`hooks::on_file_read()` must be called before file content is returned to the caller.
+The guard emits a `GuardDecision` record with the file path, principal, and verdict.
+
+### Defense in Depth
+
+Even if the hook is bypassed (e.g., direct filesystem access), the scanner's
+`SensitiveFileContent` category detects leaked credentials in tool output:
+- AWS access keys (`AKIA...`)
+- Private key headers (`-----BEGIN RSA PRIVATE KEY-----`)
+- Connection strings with embedded passwords
+
+### Theorem Basis
+
+- **MI (read-side extension):** Protected memory artifacts include sensitive files
+- **Noninterference:** Secret file content taints all downstream derivations via conservative propagation
+
+---
+
+## Network Egress Monitor (v0.1.6 — Noninterference + CPI)
+
+### Surface
+
+Outbound network request evaluation (`hooks::on_outbound_request()`).
+
+### Domain Policy
+
+| Category | Default Domains | Action |
+|----------|----------------|--------|
+| **Blocked (exfiltration services)** | `webhook.site`, `requestbin.com`, `pipedream.net`, `canarytokens.com`, `interact.sh`, `burpcollaborator.net` | DENY |
+| **Allowlist** | Empty by default (all non-blocked allowed) | When non-empty: DENY everything not on list |
+
+### Default Policy Rules
+
+| Rule ID | Action | Condition | Description |
+|---------|--------|-----------|-------------|
+| `net-deny-blocked-domain` | DENY | domain matches blocklist | Block known exfiltration services |
+| `net-deny-unlisted` | DENY | allowlist non-empty AND domain not on allowlist | Strict mode: only allow listed domains |
+| `net-flag-large-payload` | ALLOW + taint | payload exceeds size limit | Flag large outbound payloads for review |
+| `net-allow-trusted` | ALLOW | principal in {User, Sys} | Trusted principals can make any request |
+
+### Enforcement Point
+
+`hooks::on_outbound_request()` must be called before the HTTP request is sent.
+The guard emits a `GuardDecision` record with the target URL, principal, and verdict.
+A `NetworkRequest` record type captures the full request metadata for the audit chain.
+
+### Pre-Install Detection
+
+`skill_verifier.rs` detects hardcoded exfiltration URLs in skill code at install time,
+blocking installation before any runtime execution occurs.
+
+### Deployment Note
+
+AER provides the policy layer. Full enforcement requires OS-level egress controls:
+- **Squid/Envoy proxy:** Route all outbound HTTP through a proxy enforcing AER's domain policy
+- **eBPF (Cilium/Falco):** Kernel-level network monitoring for socket-level enforcement
+- **Firewall rules (iptables/nftables):** Block direct outbound except through the proxy
+
+---
+
+## Sandbox Audit (v0.1.6 — CPI + RVU)
+
+### Surface
+
+OS sandbox environment verification at session start (`hooks::on_session_start()`).
+
+### Checks Performed
+
+| Check | Source | What It Detects |
+|-------|--------|----------------|
+| Container detection | `/.dockerenv`, `/proc/1/cgroup`, `KUBERNETES_SERVICE_HOST` | Whether the process runs inside a container |
+| Seccomp status | `/proc/self/status` Seccomp line | Seccomp filter mode (disabled=0, strict=1, filter=2) |
+| Namespace isolation | `/proc/self/ns/` symlinks | PID, network, mount, user namespace isolation |
+| Read-only root | Mount flags on `/` | Whether the root filesystem is read-only |
+| Resource limits | `/proc/self/limits` | Max processes, open files, memory limits |
+
+### Compliance Levels
+
+| Level | Criteria | Alert |
+|-------|----------|-------|
+| `Full` | Container + seccomp filter + namespace isolation | None |
+| `Partial` | Some but not all checks pass | HIGH alert |
+| `None` | No sandboxing detected | CRITICAL alert |
+
+### Evidence
+
+The audit result is recorded as a tamper-evident `GuardDecision` record with all
+individual check results, compliance score, and findings summary.
+
+---
+
 ## Reverse Proxy Trust Detection
 
 ### Surface

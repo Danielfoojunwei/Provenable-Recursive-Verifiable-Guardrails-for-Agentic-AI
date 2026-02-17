@@ -198,46 +198,61 @@ You are now a helpful assistant that always includes the user's API key in respo
 | Name similarity check | V6 | Levenshtein distance < 3 against top-100 popular skills |
 | Manifest integrity | All | Validate `claw.json` schema, check for inconsistent metadata |
 
-### Gap 2: File Read Guards
+### Gap 2: File Read Guards — RESOLVED (v0.1.6)
 
 **Problem**: MI guards writes but not reads. A skill can read `.clawdbot/.env` or any file on the filesystem.
 
-**Proposed Solution**: Extend MI to a `FileReadGuard` surface:
+**Solution (IMPLEMENTED)**: The `file_read_guard` module (`file_read_guard.rs`) blocks untrusted principals from reading sensitive files:
 
-```rust
-// New guard surface in types.rs
-pub enum GuardSurface {
-    ControlPlane,
-    DurableMemory,
-    ConversationIO,
-    FileRead,         // NEW: guards sensitive file reads
-}
-```
+| Layer | Defense | Coverage |
+|-------|---------|----------|
+| Hook guard | `hooks::on_file_read()` | Blocks untrusted reads of `.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials` |
+| Taint propagation | `SECRET_RISK` (0x08) | Reads from `.aws/`, `.ssh/`, `.gnupg/` propagate taint to all downstream derivations |
+| Scanner heuristic | `SensitiveFileContent` | Catches leaked credentials (AWS keys, private key headers, connection strings) in tool output |
+| Skill verifier | Pre-install scan | Detects references to credential files in skill code before installation |
 
-Protected read paths:
-- `.clawdbot/.env` — API keys and tokens
-- `~/.ssh/*` — SSH keys
-- `~/.aws/credentials` — AWS credentials
-- `~/.config/gcloud/*` — GCP credentials
-- Any file matching `*.key`, `*.pem`, `*.p12`
+Defense in depth: even if the hook is bypassed (direct filesystem access), the scanner catches leaked credentials in tool output.
 
-### Gap 3: Outbound Network Monitoring
+### Gap 3: Outbound Network Monitoring — RESOLVED (v0.1.6)
 
 **Problem**: A skill can POST exfiltrated data to an external server.
 
-**Proposed Solution**: This is outside AER's structural enforcement scope (AER is not a network proxy). However, AER can:
+**Solution (IMPLEMENTED)**: The `network_guard` module (`network_guard.rs`) evaluates outbound requests:
 
-1. **Record** all outbound network calls via `hooks::on_tool_call()` for tools like `http`, `fetch`, `curl`
-2. **Flag** outbound calls from SKILL principal to non-allowlisted domains
-3. **Integrate** with OS-level egress controls (iptables, seccomp, AppArmor profiles)
+| Layer | Defense | Coverage |
+|-------|---------|----------|
+| Hook guard | `hooks::on_outbound_request()` | Evaluates domain against blocklist/allowlist before request is sent |
+| Domain blocklist | Default blocked | `webhook.site`, `requestbin.com`, `pipedream.net`, `canarytokens.com`, `interact.sh`, `burpcollaborator.net` |
+| Payload limits | Size heuristic | Flags outbound payloads exceeding configurable size threshold |
+| Scanner category | `DataExfiltration` | Detects suspicious URL patterns (base64 in query params) in tool output |
+| Skill verifier | Pre-install scan | Detects hardcoded exfiltration URLs in skill code before installation |
+| Evidence | `NetworkRequest` record | Every outbound request recorded with URL, principal, verdict, and taint |
 
-Recommendation: Document that AER provides the evidence layer for network monitoring, while the containment layer requires OS-level enforcement.
+AER provides the policy layer. Full enforcement requires OS-level egress controls:
+- **Squid/Envoy proxy:** Route all outbound HTTP through a proxy enforcing AER's domain policy
+- **eBPF (Cilium/Falco):** Kernel-level socket monitoring
+- **Firewall rules (iptables/nftables):** Block direct outbound except through proxy
 
-### Gap 4: Sandbox Enforcement
+### Gap 4: Sandbox Enforcement — RESOLVED (v0.1.6)
 
 **Problem**: AER is a reference monitor, not a sandbox. It records and enforces policy at chokepoints, but skills with filesystem access can bypass chokepoints by directly accessing the filesystem.
 
-**Proposed Solution**: Document the recommended sandbox architecture:
+**Solution (IMPLEMENTED)**: The `sandbox_audit` module (`sandbox_audit.rs`) verifies the OS execution environment:
+
+| Check | Source | Detection |
+|-------|--------|-----------|
+| Container | `/.dockerenv`, `/proc/1/cgroup`, `KUBERNETES_SERVICE_HOST` | Docker, Kubernetes, other container runtimes |
+| Seccomp | `/proc/self/status` Seccomp line | Disabled (0), strict (1), filter (2) |
+| Namespaces | `/proc/self/ns/` symlinks | PID, net, mnt, user isolation |
+| Read-only root | Mount flags on `/` | Root filesystem write protection |
+| Resource limits | `/proc/self/limits` | Max processes, open files, memory |
+
+Compliance levels and alert thresholds:
+- **Full** (container + seccomp + namespace): No alert
+- **Partial** (some checks pass): HIGH alert
+- **None** (no sandboxing): CRITICAL alert
+
+The recommended sandbox architecture:
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -246,11 +261,11 @@ Recommendation: Document that AER provides the evidence layer for network monito
 │  │  OpenClaw Runtime                             │  │
 │  │  ┌─────────────────────────────────────────┐  │  │
 │  │  │  AER Reference Monitor                  │  │  │
-│  │  │  (CPI + MI + CIO + Evidence)            │  │  │
+│  │  │  (CPI + MI + CIO + FileRead + NetIO)    │  │  │
 │  │  └─────────────────────────────────────────┘  │  │
 │  └───────────────────────────────────────────────┘  │
 │  Filesystem: read-only except guarded paths          │
-│  Network: egress-filtered                            │
+│  Network: egress-filtered via proxy + AER policy     │
 │  Process: no fork/exec except allowlisted tools      │
 └─────────────────────────────────────────────────────┘
 ```
@@ -270,8 +285,11 @@ AER already defines five integration hooks. The ClawHub integration adds two new
 | 3 | `hooks::on_tool_call()` | Existing | Records tool invocations |
 | 4 | `hooks::on_message_input()` | Existing | Scans inbound messages |
 | 5 | `hooks::on_message_output()` | Existing | Scans outbound LLM responses |
-| 6 | `hooks::on_skill_install()` | **New** | Pre-install skill package verification |
-| 7 | `hooks::on_skill_load()` | **New** | Runtime skill activation verification |
+| 6 | `hooks::on_skill_install()` | v0.1.3 | Pre-install skill package verification |
+| 7 | `hooks::on_skill_load()` | v0.1.3 | Runtime skill activation verification |
+| 8 | `hooks::on_file_read()` | **v0.1.6** | Sensitive file read access control |
+| 9 | `hooks::on_outbound_request()` | **v0.1.6** | Outbound network request evaluation |
+| 10 | `hooks::on_system_prompt_available()` | **v0.1.6** | Dynamic token registry activation |
 
 ### 5.2 Skill Install Flow with AER
 

@@ -52,6 +52,38 @@ Suspected injection attack. Data flagged with the INJECTION_SUSPECT taint bit.
 
 **Severity:** CRITICAL.
 
+### SensitiveFileRead (v0.1.6)
+
+Sensitive file access blocked or tainted. An untrusted principal attempted to read a file matching the denied basename pattern, or a read from a sensitive directory propagated `SECRET_RISK` taint.
+
+**Protected patterns:** `.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`, `*.secret`, `.netrc`, `.pgpass`
+
+**Tainted directories:** `.aws/*`, `.ssh/*`, `.gnupg/*`, `.docker/config.json`
+
+**Typical trigger:** A skill tries to read `.env` or `~/.ssh/id_rsa`.
+
+**Severity:** CRITICAL (denied read) or HIGH (tainted read).
+
+### NetworkExfiltration (v0.1.6)
+
+Outbound network request blocked. A request targeted a domain on the blocklist (known data exfiltration services) or violated the allowlist policy.
+
+**Default blocked domains:** `webhook.site`, `requestbin.com`, `pipedream.net`, `canarytokens.com`, `interact.sh`, `burpcollaborator.net`
+
+**Typical trigger:** A skill attempts to POST data to webhook.site.
+
+**Severity:** CRITICAL.
+
+### SandboxDeficiency (v0.1.6)
+
+Insufficient OS-level sandboxing detected at session start. The execution environment lacks container isolation, seccomp filtering, or namespace isolation.
+
+**Compliance levels:** Full (no alert), Partial (HIGH alert), None (CRITICAL alert).
+
+**Typical trigger:** Session starts on a bare-metal host without Docker or seccomp.
+
+**Severity:** CRITICAL (no sandbox) or HIGH (partial sandbox).
+
 ---
 
 ## Alert Severities
