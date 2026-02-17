@@ -13,9 +13,14 @@
 mod system_prompt_registry {
     use aer::output_guard;
     use aer::system_prompt_registry;
+    use std::sync::Mutex;
+
+    /// Serialize tests that share the global REGISTRY singleton.
+    static REGISTRY_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_registry_activates_dynamic_discovery_for_output_guard() {
+        let _lock = REGISTRY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         system_prompt_registry::clear();
 
         // Register a system prompt with a novel internal token
@@ -55,6 +60,7 @@ mod system_prompt_registry {
 
     #[test]
     fn test_token_only_registration_path() {
+        let _lock = REGISTRY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         system_prompt_registry::clear();
 
         // Simulate future OpenClaw API exposing individual tokens
@@ -81,6 +87,7 @@ mod system_prompt_registry {
 
     #[test]
     fn test_prompt_re_registration_replaces_tokens() {
+        let _lock = REGISTRY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         system_prompt_registry::clear();
 
         system_prompt_registry::register_system_prompt("Use FIRST_SECRET_TOKEN for auth.");
@@ -101,6 +108,7 @@ mod system_prompt_registry {
 
     #[test]
     fn test_prompt_hash_for_audit_correlation() {
+        let _lock = REGISTRY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         system_prompt_registry::clear();
 
         system_prompt_registry::register_system_prompt("Deterministic prompt content.");

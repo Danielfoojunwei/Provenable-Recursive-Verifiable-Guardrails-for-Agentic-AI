@@ -166,9 +166,14 @@ pub fn clear() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Serialize tests that share the global REGISTRY singleton.
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_register_system_prompt() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         clear();
         let prompt = "Use CUSTOM_SECRET_TOKEN for auth. Call buildPromptSection() to construct.";
         let count = register_system_prompt(prompt);
@@ -179,6 +184,7 @@ mod tests {
 
     #[test]
     fn test_register_tokens_only() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         clear();
         let count = register_tokens_only(vec![
             "MY_CUSTOM_TOKEN".into(),
@@ -193,6 +199,7 @@ mod tests {
 
     #[test]
     fn test_dynamic_tokens_catch_leakage() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         clear();
         let prompt = "Internal: AGENT_BOOTSTRAP_KEY is critical. Use initAgentSession() to start.";
         register_system_prompt(prompt);
@@ -208,6 +215,7 @@ mod tests {
 
     #[test]
     fn test_clean_output_remains_clean() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         clear();
         let prompt = "Internal: SOME_TOKEN exists. Call buildPrompt().";
         register_system_prompt(prompt);
@@ -222,6 +230,7 @@ mod tests {
 
     #[test]
     fn test_re_registration_replaces_config() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         clear();
         register_system_prompt("Use TOKEN_ALPHA for auth.");
         let hash1 = prompt_hash().unwrap();
@@ -236,6 +245,7 @@ mod tests {
 
     #[test]
     fn test_clear_resets_registry() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         register_system_prompt("Use SECRET_THING for auth.");
         assert!(get_cached_config().is_some());
         clear();
