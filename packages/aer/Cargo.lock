@@ -19,6 +19,7 @@ dependencies = [
  "criterion",
  "hex",
  "predicates",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml",

@@ -173,6 +173,39 @@ SNAP=$(proven-aer snapshot list | tail -1 | awk '{print $1}')
 proven-aer rollback "$SNAP"
 ```
 
+## Host Environment Queries (v0.1.6)
+
+### File read guard denials
+
+```bash
+proven-aer prove --category MI --json
+```
+
+Look for alerts with `SensitiveFileRead` category in the `.alerts` array.
+
+### Network exfiltration blocks
+
+```bash
+proven-aer prove --category INJECTION --json
+```
+
+Look for alerts with `NetworkExfiltration` category.
+
+### Sandbox compliance
+
+```bash
+proven-aer prove --json
+```
+
+Look for alerts with `SandboxDeficiency` category. If no such alert exists, the
+environment is either fully compliant or AER has not been initialized.
+
+### All v0.1.6 guard surface activity
+
+```bash
+proven-aer prove --json | jq '.alerts[] | select(.category == "SensitiveFileRead" or .category == "NetworkExfiltration" or .category == "SandboxDeficiency")'
+```
+
 ## Interpreting Exit Codes
 
 ### aegx verify

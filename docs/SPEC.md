@@ -155,6 +155,7 @@ The `type` field MUST be one of the following values:
 | `GuardDecision`              | A CPI or MI guard's allow/deny decision.                        |
 | `Snapshot`                   | A verifiable snapshot of system state.                          |
 | `Rollback`                   | A rollback to a previously captured snapshot.                   |
+| `NetworkRequest`               | An outbound network request made by the agent or a tool.        |
 
 ### 4.4 Principals
 
@@ -491,7 +492,82 @@ considerations:
 - Blob integrity depends on SHA-256 collision resistance. See the threat model
   for collision considerations.
 
-## 12. References
+## 12. Empirical Validation
+
+The AEGX + AER implementation has been validated against the ZeroLeaks
+attack taxonomy (zeroleaks.ai), which tested 36 attack vectors across prompt
+injection (23 attacks) and system prompt extraction (13 attacks).
+
+### 12.1 Benchmark Methodology
+
+Attack payloads were reconstructed from the ZeroLeaks OpenClaw Security
+Assessment and run through the actual AER scanner and output guard code.
+No mocking or simulation — the real detection functions process real attack
+strings. The benchmark test is at `packages/aer/tests/zeroleaks_benchmark.rs`.
+
+### 12.2 Results Summary
+
+| Layer | Metric | v0.1.1 | v0.1.2 | v0.1.3 | v0.1.4 (Current) |
+|-------|--------|--------|--------|--------|-------------------|
+| Input Scanner | Extraction attacks blocked/tainted | 8/13 (61.5%) | **11/13 (84.6%)** | 11/13 | 11/13 (84.6%) |
+| Input Scanner | Injection attacks blocked/tainted | 22/23 (95.7%) | 22/23 | 22/23 | 22/23 (95.7%) |
+| Output Guard | Leaked response patterns caught | 11/11 (100%) | 11/11 | 11/11 | 11/11 (100%) |
+| Output Guard | False positive rate | 0% | 0% | 0% | 0% |
+| Combined | ZLSS (1-10, lower=better) | 2/10 | **1/10** | 1/10 | **1/10** |
+| Combined | Security Score (0-100) | 79/100 | **90/100** | 90/100 | **90/100** |
+| Skill Verifier | ClawHavoc attack vectors detected | — | — | **6/6** | 6/6 |
+| Rollback Policy | Auto-recovery mechanisms | — | — | — | **3 (auto-snapshot, recommendation, auto-rollback)** |
+| MI Read-Side | Reader principal taint tracking | — | — | — | **Tracked** |
+| Test Suite | Total tests passing | 114 | 152 | 168 | **278** |
+
+### 12.3 Theorem Coverage
+
+Each detection category and defense layer is grounded in a published formal
+theorem or a derived corollary:
+
+**Base theorems:**
+- **Noninterference Theorem**: EncodedPayload, IndirectInjection, ManyShotPriming, FormatOverride
+- **CPI Theorem**: SystemImpersonation, BehaviorManipulation
+- **MI Theorem**: ExtractionAttempt, FalseContextInjection (+ Noninterference)
+- **RVU Machine Unlearning**: All GuardDecision records feed the contamination DAG
+
+**Corollaries (v0.1.2):**
+- **Conversational Noninterference**: Session-level taint accumulation for crescendo detection
+- **CPI Behavioral Constraint**: Canary injection → INJECTION_SUSPECT (control-plane mutation)
+- **MI Dynamic Token Discovery**: Runtime watchlist from actual system prompt
+- **Semantic Intent Detection**: Regex verb+target matching (Noninterference extension)
+
+**Supply-Chain Defense (v0.1.3):**
+- **Skill Verifier**: Pre-install scanning for all 6 ClawHavoc attack vectors (CPI + Noninterference)
+- **Evidence Chain**: Every skill verification emits a tamper-evident GuardDecision record (RVU)
+
+**Automated Recovery & Theorem Gap Closures (v0.1.4):**
+- **Auto-Snapshot Before CPI**: `auto_snapshot_before_cpi()` creates rollback point before every allowed CPI mutation (RVU §2)
+- **Rollback Recommendation**: `on_guard_denial()` at 3+ denials emits recommendation alert (RVU §3)
+- **Threshold Auto-Rollback**: 5+ denials in 120s triggers automatic rollback + CRITICAL alert (RVU §4)
+- **Contamination Scope**: `compute_contamination_scope()` BFS on provenance DAG (RVU closure)
+- **MI Read-Side Taint**: `read_memory_file()` now tracks reader principal; untrusted readers get tainted provenance (MI + Noninterference conservative-union)
+- **Agent Notification**: `/prove` includes `rollback_status.agent_messages` (all four theorems)
+
+**Host Environment Hardening (v0.1.6):**
+- **System Prompt Registry**: `SystemPromptRegistry` singleton caches system prompt tokens for dynamic output guard discovery (MI Dynamic Discovery Corollary)
+- **File Read Guard**: `FileReadGuard` blocks/taints sensitive file reads for untrusted principals (MI read-side + Noninterference)
+- **Network Egress Monitor**: `NetworkGuard` evaluates outbound requests against domain blocklist/allowlist (Noninterference + CPI)
+- **Sandbox Audit**: `SandboxAudit` verifies container/seccomp/namespace at session start (CPI + RVU)
+- **Scanner Extensions**: `SensitiveFileContent` and `DataExfiltration` categories (MI + Noninterference)
+
+### 12.4 Known Limitations
+
+1. Regex intent detection only — no LLM-based semantic understanding
+2. Benchmark tests individual messages — multi-turn detection verified separately
+3. Adversarial prompt evolution may outpace static regex patterns
+4. Benchmark measures detection, not LLM compliance with attacks
+5. ~~No file-read guards~~ — **Addressed (v0.1.6):** `FileReadGuard` blocks/taints sensitive file reads; scanner `SensitiveFileContent` category catches leaked credentials
+6. ~~No outbound network monitoring~~ — **Addressed (v0.1.6):** `NetworkGuard` provides policy-layer domain blocklist/allowlist; full enforcement requires OS-level egress proxy
+7. Session state is in-memory only — server restart loses crescendo detection state
+8. Auto-rollback requires a prior snapshot to exist — if no snapshot was created, auto-rollback cannot execute
+
+## 13. References
 
 - [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) -- Date and Time on the Internet: Timestamps
 - [Unicode NFC](https://unicode.org/reports/tr15/) -- Unicode Normalization Forms

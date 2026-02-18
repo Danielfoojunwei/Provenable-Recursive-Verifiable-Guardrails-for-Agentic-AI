@@ -50,6 +50,16 @@ pub enum ThreatCategory {
     RateLimitExceeded,
     /// Injection attempt suspected.
     InjectionSuspect,
+    /// System prompt extraction attempt blocked.
+    PromptExtraction,
+    /// System prompt leakage detected in output.
+    PromptLeakage,
+    /// Rollback recommended due to repeated denials.
+    RollbackRecommended,
+    /// Auto-rollback triggered by denial threshold.
+    AutoRollback,
+    /// RVU contamination scope detected — downstream records affected.
+    ContaminationDetected,
 }
 
 impl std::fmt::Display for ThreatCategory {
@@ -61,6 +71,11 @@ impl std::fmt::Display for ThreatCategory {
             ThreatCategory::ProxyMisconfig => write!(f, "PROXY_MISCONFIG"),
             ThreatCategory::RateLimitExceeded => write!(f, "RATE_LIMIT_EXCEEDED"),
             ThreatCategory::InjectionSuspect => write!(f, "INJECTION_SUSPECT"),
+            ThreatCategory::PromptExtraction => write!(f, "PROMPT_EXTRACTION"),
+            ThreatCategory::PromptLeakage => write!(f, "PROMPT_LEAKAGE"),
+            ThreatCategory::RollbackRecommended => write!(f, "ROLLBACK_RECOMMENDED"),
+            ThreatCategory::AutoRollback => write!(f, "AUTO_ROLLBACK"),
+            ThreatCategory::ContaminationDetected => write!(f, "CONTAMINATION_DETECTED"),
         }
     }
 }
@@ -177,6 +192,11 @@ pub fn emit_proxy_alert(
     Ok(alert)
 }
 
+/// Append an alert to the alerts JSONL file (public for rollback_policy).
+pub fn append_alert_pub(alert: &ThreatAlert) -> io::Result<()> {
+    append_alert(alert)
+}
+
 /// Append an alert to the alerts JSONL file.
 fn append_alert(alert: &ThreatAlert) -> io::Result<()> {
     let path = alerts_file();
@@ -284,6 +304,11 @@ fn classify_severity(category: ThreatCategory, decision: &GuardDecisionDetail) -
         ThreatCategory::ProxyMisconfig => AlertSeverity::High,
         ThreatCategory::RateLimitExceeded => AlertSeverity::Critical,
         ThreatCategory::InjectionSuspect => AlertSeverity::Critical,
+        ThreatCategory::PromptExtraction => AlertSeverity::Critical,
+        ThreatCategory::PromptLeakage => AlertSeverity::Critical,
+        ThreatCategory::RollbackRecommended => AlertSeverity::High,
+        ThreatCategory::AutoRollback => AlertSeverity::Critical,
+        ThreatCategory::ContaminationDetected => AlertSeverity::Critical,
     }
 }
 
@@ -321,6 +346,31 @@ fn format_summary(
             "CRITICAL: Injection attempt suspected from {:?} targeting '{}'. \
              Taint flags: {:?}.",
             decision.principal, target, decision.taint
+        ),
+        ThreatCategory::PromptExtraction => format!(
+            "CRITICAL: System prompt extraction attempt blocked from {:?} targeting '{}'. \
+             Taint flags: {:?}.",
+            decision.principal, target, decision.taint
+        ),
+        ThreatCategory::PromptLeakage => format!(
+            "CRITICAL: System prompt leakage detected in outbound response for '{}'. \
+             Rule '{}' blocked the response.",
+            target, decision.rule_id
+        ),
+        ThreatCategory::RollbackRecommended => format!(
+            "ROLLBACK RECOMMENDED: Repeated denials on {:?} surface targeting '{}'. \
+             Consider rolling back to a known-good snapshot.",
+            decision.surface, target
+        ),
+        ThreatCategory::AutoRollback => format!(
+            "AUTO-ROLLBACK: Denial threshold exceeded. System automatically \
+             rolled back targeting '{}'. Rule '{}' triggered the rollback.",
+            target, decision.rule_id
+        ),
+        ThreatCategory::ContaminationDetected => format!(
+            "CONTAMINATION: Downstream records affected by compromised source '{}'. \
+             RVU closure computation identified affected records for review.",
+            target
         ),
     }
 }

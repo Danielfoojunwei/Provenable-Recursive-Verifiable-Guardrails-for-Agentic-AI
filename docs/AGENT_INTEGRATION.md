@@ -27,6 +27,9 @@ Every section is written as a machine-readable procedure with exact commands, ex
 | Tamper-evident action log | `aegx` CLI | Every action has a content-derived hash; any change breaks the chain |
 | Control-plane protection | `proven-aer` | Untrusted inputs cannot change skills, tools, permissions, or config |
 | Memory protection | `proven-aer` | Tainted writes to persistent files are blocked |
+| File read protection | `proven-aer` | Sensitive files (`.env`, SSH keys, credentials) blocked from untrusted reads (v0.1.6) |
+| Network egress monitoring | `proven-aer` | Outbound requests evaluated against domain blocklist/allowlist (v0.1.6) |
+| Sandbox verification | `proven-aer` | OS-level sandboxing (container, seccomp, namespaces) verified at session start (v0.1.6) |
 | Rollback | `proven-aer` | Exact-hash restoration to any previous snapshot |
 | Portable evidence | `.aegx.zip` | Self-contained bundle anyone can verify offline |
 
@@ -91,6 +94,7 @@ The core pattern is: **every action your agent takes becomes a record in the bun
 | Attempt to change config | `ControlPlaneChangeRequest` | varies |
 | Attempt to write memory | `MemoryCommitRequest` | varies |
 | Guard allows or denies | `GuardDecision` | `SYS` |
+| Outbound network request | `NetworkRequest` | varies |
 | Take a snapshot | `Snapshot` | `SYS` |
 | Roll back | `Rollback` | `SYS` |
 
@@ -233,6 +237,34 @@ When AER denies an action, your agent should:
 
 - `SOUL.md`, `AGENTS.md`, `TOOLS.md`, `USER.md`
 - `IDENTITY.md`, `HEARTBEAT.md`, `MEMORY.md`
+
+### File Read Guard — Sensitive Files (v0.1.6)
+
+Untrusted principals are blocked from reading:
+- `.env`, `.env.*` — environment variables and secrets
+- `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*` — cryptographic keys
+- `credentials`, `*.secret`, `.netrc`, `.pgpass` — credential files
+
+Reads from `.aws/`, `.ssh/`, `.gnupg/`, `.docker/config.json` propagate `SECRET_RISK` taint.
+
+### Network Egress Guard — Blocked Domains (v0.1.6)
+
+Outbound requests to known exfiltration services are blocked:
+- `webhook.site`, `requestbin.com`, `pipedream.net`
+- `canarytokens.com`, `interact.sh`, `burpcollaborator.net`
+
+When the allowlist is non-empty, only listed domains are permitted (strict mode).
+
+### Sandbox Audit — Session Start Verification (v0.1.6)
+
+At session start, AER automatically verifies the OS execution environment:
+- Container detection (Docker, Kubernetes)
+- Seccomp filter status
+- Namespace isolation (PID, network, mount, user)
+- Read-only root filesystem
+
+If no sandboxing is detected, a `CRITICAL` alert is emitted. Your agent should
+relay this warning to the user.
 
 ---
 

@@ -110,6 +110,59 @@ rules:
 
 Place custom policies at `~/.proven/.aer/policy/default.yaml`.
 
+## File Read Guard Rules (v0.1.6)
+
+### Rule: fs-deny-untrusted-sensitive
+
+**Surface:** FileSystem
+**Action:** Deny
+**Condition:** Principal is Web, Skill, Channel, or External AND path matches denied basename pattern
+**Description:** Block untrusted reads of sensitive files (.env, *.pem, *.key, id_rsa*, credentials).
+
+### Rule: fs-taint-sensitive-dir
+
+**Surface:** FileSystem
+**Action:** Allow + SECRET_RISK taint
+**Condition:** Path matches tainted directory pattern (.aws/*, .ssh/*, .gnupg/*)
+**Description:** Allow read but propagate SECRET_RISK (0x08) taint to all downstream derivations.
+
+### Rule: fs-allow-trusted
+
+**Surface:** FileSystem
+**Action:** Allow
+**Condition:** Principal is User or Sys
+**Description:** Trusted principals can read any file.
+
+## Network Egress Rules (v0.1.6)
+
+### Rule: net-deny-blocked-domain
+
+**Surface:** NetworkIO
+**Action:** Deny
+**Condition:** Target domain matches blocklist (webhook.site, requestbin.com, pipedream.net, canarytokens.com, interact.sh, burpcollaborator.net)
+**Description:** Block outbound requests to known exfiltration services.
+
+### Rule: net-deny-unlisted
+
+**Surface:** NetworkIO
+**Action:** Deny
+**Condition:** Allowlist is non-empty AND target domain is not on allowlist
+**Description:** In strict mode, deny all requests to domains not on the allowlist.
+
+### Rule: net-flag-large-payload
+
+**Surface:** NetworkIO
+**Action:** Allow + taint
+**Condition:** Outbound payload exceeds configured size limit
+**Description:** Flag large outbound payloads for review.
+
+### Rule: net-allow-trusted
+
+**Surface:** NetworkIO
+**Action:** Allow
+**Condition:** Principal is User or Sys
+**Description:** Trusted principals can make any outbound request.
+
 ## Guard Evaluation Order
 
 1. Rules are evaluated in order (first match wins)

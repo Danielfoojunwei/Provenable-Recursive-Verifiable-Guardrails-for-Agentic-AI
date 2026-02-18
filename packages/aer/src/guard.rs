@@ -78,6 +78,13 @@ fn classify_threat(surface: GuardSurface, taint: TaintFlags) -> ThreatCategory {
                 ThreatCategory::MiViolation
             }
         }
+        GuardSurface::ConversationIO => {
+            if taint.is_tainted() {
+                ThreatCategory::TaintBlock
+            } else {
+                ThreatCategory::PromptExtraction
+            }
+        }
     }
 }
 
@@ -240,6 +247,233 @@ impl Guard {
         }
 
         Ok((verdict, record))
+    }
+
+    /// Evaluate an inbound message for prompt injection and extraction.
+    /// Scans the message content, applies taint from findings, evaluates
+    /// conversation-level state (crescendo detection), and evaluates policy.
+    pub fn check_conversation_input(
+        &self,
+        principal: Principal,
+        base_taint: TaintFlags,
+        content: &str,
+        session_id: &str,
+        parent_records: Vec<String>,
+    ) -> io::Result<(GuardVerdict, crate::scanner::ScanResult, TypedRecord)> {
+        let timer = EvalTimer::start(GuardSurface::ConversationIO);
+
+        // Run the per-message scanner
+        let mut scan_result = crate::scanner::scan_input(content);
+
+        // Conversation-level state analysis (Conversational Noninterference Corollary)
+        // Detects crescendo attacks that distribute extraction intent across messages.
+        let conv_analysis = crate::conversation_state::analyze_in_context(
+            session_id, content, &scan_result,
+        );
+
+        if conv_analysis.crescendo_detected {
+            // Inject a synthetic ExtractionAttempt finding from session analysis
+            scan_result.findings.push(crate::scanner::ScanFinding {
+                category: crate::scanner::ScanCategory::ExtractionAttempt,
+                description: format!(
+                    "Crescendo attack detected via session analysis: {}",
+                    conv_analysis.rationale
+                ),
+                confidence: 0.90,
+                evidence: format!(
+                    "Accumulated score: {:.2}, extraction messages: {}",
+                    conv_analysis.accumulated_score,
+                    conv_analysis.extraction_message_count,
+                ),
+            });
+            // Escalate taint — crescendo probes carry UNTRUSTED at minimum
+            scan_result.taint_flags |= TaintFlags::UNTRUSTED.bits();
+
+            // Recompute verdict with the injected finding
+            scan_result.verdict = if scan_result.findings.iter().any(|f| {
+                matches!(
+                    f.category,
+                    crate::scanner::ScanCategory::SystemImpersonation
+                    | crate::scanner::ScanCategory::ExtractionAttempt
+                ) && f.confidence >= 0.9
+            }) {
+                crate::scanner::ScanVerdict::Block
+            } else if scan_result.findings.iter().filter(|f| f.confidence >= 0.75).count() >= 3 {
+                crate::scanner::ScanVerdict::Block
+            } else {
+                crate::scanner::ScanVerdict::Suspicious
+            };
+        }
+
+        // Merge scanner taint with base taint
+        let scanner_taint = TaintFlags::from_bits(scan_result.taint_flags)
+            .unwrap_or(TaintFlags::empty());
+        let combined_taint = base_taint | scanner_taint;
+
+        // Determine verdict: if scanner says Block, deny without policy check
+        let (verdict, rule_id, rationale) = match scan_result.verdict {
+            crate::scanner::ScanVerdict::Block => (
+                GuardVerdict::Deny,
+                "scanner-block".to_string(),
+                format!("Scanner blocked: {} findings (crescendo: {})",
+                    scan_result.findings.len(), conv_analysis.crescendo_detected),
+            ),
+            _ => {
+                // Evaluate policy with combined taint
+                policy::evaluate(
+                    &self.policy,
+                    GuardSurface::ConversationIO,
+                    principal,
+                    combined_taint,
+                    false,
+                )
+            }
+        };
+
+        // Rate-limit denied requests
+        if verdict == GuardVerdict::Deny {
+            check_denial_rate_limit()?;
+        }
+
+        let detail = GuardDecisionDetail {
+            verdict,
+            rule_id: rule_id.clone(),
+            rationale: rationale.clone(),
+            surface: GuardSurface::ConversationIO,
+            principal,
+            taint: combined_taint,
+        };
+
+        let mut meta = RecordMeta::now();
+        meta.session_id = Some(session_id.to_string());
+        meta.rule_id = Some(rule_id);
+
+        let payload = json!({
+            "guard_decision": detail,
+            "scan_verdict": format!("{:?}", scan_result.verdict),
+            "findings_count": scan_result.findings.len(),
+        });
+
+        let record = records::emit_record(
+            RecordType::GuardDecision,
+            principal,
+            combined_taint,
+            parent_records,
+            meta,
+            payload,
+        )?;
+
+        audit_chain::emit_audit(&record.record_id)?;
+        timer.finish(verdict);
+
+        // Emit threat alert on denial
+        if verdict == GuardVerdict::Deny {
+            let category = classify_threat(GuardSurface::ConversationIO, combined_taint);
+            let _ = alerts::emit_alert(category, &detail, &record.record_id, session_id);
+        }
+
+        Ok((verdict, scan_result, record))
+    }
+
+    /// Scan an outbound LLM response for system prompt leakage.
+    ///
+    /// **v0.1.5**: When `config` is `None`, the guard now checks the
+    /// `system_prompt_registry` for a cached config built from dynamic
+    /// token discovery. This means dynamically discovered tokens are
+    /// used automatically once a system prompt has been registered via
+    /// `hooks::on_system_prompt_available()`.
+    pub fn check_conversation_output(
+        &self,
+        content: &str,
+        session_id: &str,
+        config: Option<&crate::output_guard::OutputGuardConfig>,
+        parent_records: Vec<String>,
+    ) -> io::Result<(bool, crate::output_guard::OutputScanResult, TypedRecord)> {
+        let timer = EvalTimer::start(GuardSurface::ConversationIO);
+
+        // Fallback chain: explicit config > registry cache > static default
+        let registry_config = if config.is_none() {
+            crate::system_prompt_registry::get_cached_config()
+        } else {
+            None
+        };
+        let effective_config = config.or(registry_config.as_ref());
+
+        let scan_result = crate::output_guard::scan_output(content, effective_config);
+
+        let verdict = if scan_result.safe {
+            GuardVerdict::Allow
+        } else {
+            GuardVerdict::Deny
+        };
+
+        if verdict == GuardVerdict::Deny {
+            check_denial_rate_limit()?;
+        }
+
+        let taint = if scan_result.safe {
+            TaintFlags::empty()
+        } else {
+            TaintFlags::SECRET_RISK
+        };
+
+        let rule_id = if scan_result.safe {
+            "output-clean".to_string()
+        } else {
+            "output-leak-detected".to_string()
+        };
+
+        let detail = GuardDecisionDetail {
+            verdict,
+            rule_id: rule_id.clone(),
+            rationale: if scan_result.safe {
+                "Output scan clean".to_string()
+            } else {
+                format!(
+                    "Output leakage detected: {} tokens, {} structural leaks",
+                    scan_result.leaked_tokens.len(),
+                    scan_result.structural_leaks.len()
+                )
+            },
+            surface: GuardSurface::ConversationIO,
+            principal: Principal::Sys,
+            taint,
+        };
+
+        let mut meta = RecordMeta::now();
+        meta.session_id = Some(session_id.to_string());
+        meta.rule_id = Some(rule_id);
+
+        let payload = json!({
+            "guard_decision": detail,
+            "output_safe": scan_result.safe,
+            "leaked_token_count": scan_result.leaked_tokens.len(),
+            "structural_leak_count": scan_result.structural_leaks.len(),
+        });
+
+        let record = records::emit_record(
+            RecordType::GuardDecision,
+            Principal::Sys,
+            taint,
+            parent_records,
+            meta,
+            payload,
+        )?;
+
+        audit_chain::emit_audit(&record.record_id)?;
+        timer.finish(verdict);
+
+        // Emit alert on leakage detection
+        if verdict == GuardVerdict::Deny {
+            let _ = alerts::emit_alert(
+                ThreatCategory::PromptLeakage,
+                &detail,
+                &record.record_id,
+                session_id,
+            );
+        }
+
+        Ok((scan_result.safe, scan_result, record))
     }
 }
 

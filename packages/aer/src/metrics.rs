@@ -39,6 +39,10 @@ pub struct GuardMetrics {
     pub cpi_denials: u64,
     /// MI denials.
     pub mi_denials: u64,
+    /// Total ConversationIO evaluations.
+    pub cio_evaluations: u64,
+    /// ConversationIO denials.
+    pub cio_denials: u64,
     /// Average evaluation time in microseconds.
     pub avg_eval_us: u64,
     /// P50 evaluation time in microseconds.
@@ -73,6 +77,8 @@ struct MetricsCollector {
     total_allows: u64,
     cpi_denials: u64,
     mi_denials: u64,
+    cio_evaluations: u64,
+    cio_denials: u64,
     /// Ring buffer of recent evaluation durations for percentile calculations.
     /// Keeps last 10,000 evaluations.
     recent_durations: Vec<u64>,
@@ -91,6 +97,8 @@ impl MetricsCollector {
             total_allows: 0,
             cpi_denials: 0,
             mi_denials: 0,
+            cio_evaluations: 0,
+            cio_denials: 0,
             recent_durations: Vec::with_capacity(10_000),
         }
     }
@@ -110,6 +118,12 @@ impl MetricsCollector {
                 self.mi_evaluations += 1;
                 if verdict == GuardVerdict::Deny {
                     self.mi_denials += 1;
+                }
+            }
+            GuardSurface::ConversationIO => {
+                self.cio_evaluations += 1;
+                if verdict == GuardVerdict::Deny {
+                    self.cio_denials += 1;
                 }
             }
         }
@@ -168,6 +182,8 @@ impl MetricsCollector {
             total_allows: self.total_allows,
             cpi_denials: self.cpi_denials,
             mi_denials: self.mi_denials,
+            cio_evaluations: self.cio_evaluations,
+            cio_denials: self.cio_denials,
             avg_eval_us: avg,
             p50_eval_us: p50,
             p95_eval_us: p95,
@@ -207,6 +223,8 @@ pub fn get_metrics() -> GuardMetrics {
             total_allows: 0,
             cpi_denials: 0,
             mi_denials: 0,
+            cio_evaluations: 0,
+            cio_denials: 0,
             avg_eval_us: 0,
             p50_eval_us: 0,
             p95_eval_us: 0,

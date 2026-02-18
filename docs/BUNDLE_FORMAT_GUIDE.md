@@ -90,7 +90,7 @@ Each line is a JSON object — one **TypedRecord** per line. This is the event l
 | Field | Type | What It Means |
 |-------|------|---------------|
 | `recordId` | 64-char hex | `SHA-256(AEGX_CANON_0_1({type, principal, taint, parents, meta, payload, schema}))`. Content-derived — if any field changes, the ID changes. |
-| `type` | string enum | What kind of action this records: `SessionStart`, `SessionMessage`, `ToolCall`, `ToolResult`, `FileRead`, `FileWrite`, `FileDelete`, `ControlPlaneChangeRequest`, `MemoryCommitRequest`, `GuardDecision`, `Snapshot`, `Rollback` |
+| `type` | string enum | What kind of action this records: `SessionStart`, `SessionMessage`, `ToolCall`, `ToolResult`, `FileRead`, `FileWrite`, `FileDelete`, `ControlPlaneChangeRequest`, `MemoryCommitRequest`, `GuardDecision`, `NetworkRequest`, `Snapshot`, `Rollback` |
 | `principal` | string enum | Who produced this record: `USER`, `SYS`, `WEB`, `TOOL`, `SKILL`, `CHANNEL`, `EXTERNAL` |
 | `taint` | string array | Taint labels propagated from inputs (e.g., `["UNTRUSTED", "WEB_DERIVED"]`). Empty array if clean. |
 | `parents` | string array | RecordIds of causal parents. Empty for root records. Creates a DAG. |
@@ -296,6 +296,24 @@ AER records may carry taint flags in their `taint` array:
 | `TOOL_OUTPUT` | Produced by a tool |
 | `SKILL_OUTPUT` | Produced by a skill |
 | `WEB_DERIVED` | Originated from the web |
+
+### AER Record Types (v0.1.6 Additions)
+
+AER v0.1.6 adds the following record type:
+
+| Type | Description |
+|------|-------------|
+| `NetworkRequest` | An outbound network request made by the agent, tool, or skill. Includes target URL, principal, domain evaluation verdict, and taint flags. |
+
+### AER Guard Surfaces (v0.1.6)
+
+AER v0.1.6 introduces three new guard surfaces that produce `GuardDecision` records:
+
+| Surface | Description | Theorem Basis |
+|---------|-------------|---------------|
+| `FileSystem` | Sensitive file read access control | MI (read-side) + Noninterference |
+| `NetworkIO` | Outbound network request evaluation | Noninterference + CPI |
+| `SandboxCompliance` | OS sandbox environment verification | CPI + RVU |
 
 ---
 

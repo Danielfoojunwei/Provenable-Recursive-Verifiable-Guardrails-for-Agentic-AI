@@ -62,9 +62,21 @@ pub fn write_memory_file(
     }
 }
 
-/// Read a memory file (no guard needed for reads, but record the access).
+/// Read a memory file with proper principal and taint tracking.
+///
+/// **v0.1.4 (MI read-side taint)**: Previously, all reads were recorded as
+/// `Principal::Sys` with empty taint, meaning an untrusted SKILL reading
+/// SOUL.md would get clean provenance. Now reads carry the actual reader's
+/// principal and appropriate taint flags, enabling downstream taint
+/// propagation (Noninterference conservative-union property).
+///
+/// The read is NOT blocked (that would break functionality), but the
+/// FileRead record carries taint that flows to any downstream operation
+/// that depends on this read.
 pub fn read_memory_file(
     filename: &str,
+    principal: Principal,
+    taint: TaintFlags,
     agent_id: Option<&str>,
     session_id: Option<&str>,
 ) -> io::Result<Option<Vec<u8>>> {
@@ -77,7 +89,15 @@ pub fn read_memory_file(
 
     let content = fs::read(&file_path)?;
 
-    // Record the read event
+    // MI read-side taint: untrusted principals reading protected memory
+    // get their output tainted to prevent clean-provenance laundering.
+    let read_taint = if principal.is_untrusted_for_memory() {
+        taint | TaintFlags::UNTRUSTED
+    } else {
+        taint
+    };
+
+    // Record the read event with actual principal and taint
     let mut meta = crate::types::RecordMeta::now();
     meta.path = Some(file_path.to_string_lossy().to_string());
     if let Some(aid) = agent_id {
@@ -91,12 +111,14 @@ pub fn read_memory_file(
         "file_path": file_path.to_string_lossy(),
         "content_hash": sha256_hex(&content),
         "content_size": content.len(),
+        "reader_principal": format!("{:?}", principal),
+        "read_taint": read_taint.bits(),
     });
 
     let record = crate::records::emit_record(
         RecordType::FileRead,
-        Principal::Sys,
-        TaintFlags::empty(),
+        principal,
+        read_taint,
         vec![],
         meta,
         payload,
