@@ -3,7 +3,7 @@ name = "aegx"
 version = "0.1.0"
 edition = "2021"
 description = "AEGX v0.1 — Tamper-evident evidence bundle format for agentic AI"
-license = "LicenseRef-Proprietary"
+license = "Apache-2.0"
 
 [[bin]]
 name = "aegx"

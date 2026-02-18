@@ -3,7 +3,7 @@ name = "proven-installer-tools"
 version = "0.1.0"
 edition = "2021"
 description = "Rust tooling for Provenable.ai AER installer — manifest validation, checksum generation, version pinning"
-license = "LicenseRef-Proprietary"
+license = "Apache-2.0"
 
 [[bin]]
 name = "installer-tools"

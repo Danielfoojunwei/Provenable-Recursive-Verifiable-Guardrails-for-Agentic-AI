@@ -3,7 +3,7 @@ name = "aer"
 version = "0.1.0"
 edition = "2021"
 description = "Agent Evidence & Recovery (AER) — AEGX Recorder, CPI/MI Guard, RVU Rollback"
-license = "LicenseRef-Proprietary"
+license = "Apache-2.0"
 
 [[bin]]
 name = "proven-aer"
