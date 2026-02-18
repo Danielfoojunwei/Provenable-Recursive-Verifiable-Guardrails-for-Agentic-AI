@@ -566,7 +566,10 @@ fn test_mi_denial_emits_alert() {
     )
     .expect("hook should not error");
 
-    assert!(result.is_err(), "MI write from SKILL with taint must be denied");
+    assert!(
+        result.is_err(),
+        "MI write from SKILL with taint must be denied"
+    );
 
     // Verify an alert was emitted
     let all_alerts = alerts::read_all_alerts().expect("read alerts");
@@ -605,7 +608,10 @@ fn test_proxy_misconfig_emits_alert() {
         "Proxy misconfiguration alert must be emitted"
     );
     assert_eq!(proxy_alerts[0].severity, AlertSeverity::High);
-    assert!(!proxy_alerts[0].blocked, "Proxy misconfig is a warning, not a block");
+    assert!(
+        !proxy_alerts[0].blocked,
+        "Proxy misconfig is a warning, not a block"
+    );
 }
 
 // ============================================================
@@ -653,8 +659,7 @@ fn test_prove_query_protection_summary() {
     .expect("mi denial");
 
     // 4. Proxy misconfig
-    hooks::check_proxy_trust(&["*".to_string()], "10.0.0.1:3000")
-        .expect("proxy check");
+    hooks::check_proxy_trust(&["*".to_string()], "10.0.0.1:3000").expect("proxy check");
 
     // Now query /prove
     let query = ProveQuery {
@@ -722,17 +727,12 @@ fn test_prove_query_category_filter() {
     .expect("cpi denial");
 
     // Generate a proxy misconfig alert
-    hooks::check_proxy_trust(&["::/0".to_string()], "127.0.0.1:9000")
-        .expect("proxy check");
+    hooks::check_proxy_trust(&["::/0".to_string()], "127.0.0.1:9000").expect("proxy check");
 
     // Query only proxy misconfig alerts
-    let proxy_alerts = alerts::read_filtered_alerts(
-        None,
-        None,
-        Some(ThreatCategory::ProxyMisconfig),
-        None,
-    )
-    .expect("read filtered alerts");
+    let proxy_alerts =
+        alerts::read_filtered_alerts(None, None, Some(ThreatCategory::ProxyMisconfig), None)
+            .expect("read filtered alerts");
 
     assert!(
         !proxy_alerts.is_empty(),
@@ -747,13 +747,9 @@ fn test_prove_query_category_filter() {
     }
 
     // Query only CPI alerts — should not include proxy alerts
-    let cpi_filtered = alerts::read_filtered_alerts(
-        None,
-        None,
-        Some(ThreatCategory::CpiViolation),
-        None,
-    )
-    .expect("read cpi filtered");
+    let cpi_filtered =
+        alerts::read_filtered_alerts(None, None, Some(ThreatCategory::CpiViolation), None)
+            .expect("read cpi filtered");
 
     for alert in &cpi_filtered {
         assert_ne!(
@@ -794,9 +790,18 @@ fn test_prove_response_formatting() {
     // Test human-readable format
     let human = prove::format_prove_response(&response);
     assert!(human.contains("Provenable.ai"), "Must contain product name");
-    assert!(human.contains("Protection Summary"), "Must contain summary section");
-    assert!(human.contains("Threats Blocked"), "Must contain blocked count");
-    assert!(human.contains("System Health"), "Must contain health section");
+    assert!(
+        human.contains("Protection Summary"),
+        "Must contain summary section"
+    );
+    assert!(
+        human.contains("Threats Blocked"),
+        "Must contain blocked count"
+    );
+    assert!(
+        human.contains("System Health"),
+        "Must contain health section"
+    );
 
     // Test JSON format
     let json_str = prove::format_prove_json(&response).expect("format json");
@@ -905,12 +910,6 @@ fn test_metrics_integration_with_guard() {
         "Should record at least 3 new evaluations, got {}",
         m.total_evaluations
     );
-    assert!(
-        m.total_denials >= 2,
-        "Should have at least 2 denials"
-    );
-    assert!(
-        m.total_allows >= 1,
-        "Should have at least 1 allow"
-    );
+    assert!(m.total_denials >= 2, "Should have at least 2 denials");
+    assert!(m.total_allows >= 1, "Should have at least 1 allow");
 }

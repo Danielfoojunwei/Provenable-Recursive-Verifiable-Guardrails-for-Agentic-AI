@@ -147,12 +147,8 @@ pub struct RollbackStatus {
 
 /// Execute a `/prove` query and return the response.
 pub fn execute_query(query: &ProveQuery) -> io::Result<ProveResponse> {
-    let all_alerts = alerts::read_filtered_alerts(
-        query.since,
-        query.until,
-        query.category,
-        query.severity_min,
-    )?;
+    let all_alerts =
+        alerts::read_filtered_alerts(query.since, query.until, query.category, query.severity_min)?;
 
     let mut alerts_result = all_alerts;
     if let Some(limit) = query.limit {
@@ -337,7 +333,10 @@ fn compute_health() -> io::Result<SystemHealth> {
         let vr = verify::verify_live()?;
         if !vr.valid {
             for err in &vr.errors {
-                warnings.push(format!("Verification error: {:?} — {}", err.kind, err.detail));
+                warnings.push(format!(
+                    "Verification error: {:?} — {}",
+                    err.kind, err.detail
+                ));
             }
         }
     }
@@ -429,8 +428,10 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     ));
 
     // Severity Breakdown
-    out.push_str(&format!("\n  CRITICAL: {}  |  HIGH: {}  |  MEDIUM: {}\n",
-        p.critical_alerts, p.high_alerts, p.medium_alerts));
+    out.push_str(&format!(
+        "\n  CRITICAL: {}  |  HIGH: {}  |  MEDIUM: {}\n",
+        p.critical_alerts, p.high_alerts, p.medium_alerts
+    ));
 
     // Metrics
     if let Some(m) = &response.metrics {
@@ -453,7 +454,11 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
         ));
         out.push_str(&format!(
             "  Audit Chain:       {}\n",
-            if h.audit_chain_valid { "VALID" } else { "BROKEN" }
+            if h.audit_chain_valid {
+                "VALID"
+            } else {
+                "BROKEN"
+            }
         ));
         out.push_str(&format!("  Records:           {}\n", h.record_count));
         out.push_str(&format!("  Audit Entries:     {}\n", h.audit_entries));
@@ -531,7 +536,10 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     }
 
     out.push_str("\n───────────────────────────────────────────────────────────────\n");
-    out.push_str(&format!("  Report generated: {}\n", response.generated_at.to_rfc3339()));
+    out.push_str(&format!(
+        "  Report generated: {}\n",
+        response.generated_at.to_rfc3339()
+    ));
     out.push_str(&format!("  Provenable.ai v{}\n", response.version));
 
     out
