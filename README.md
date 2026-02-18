@@ -752,14 +752,14 @@ fuzz/                 # Fuzz testing targets
 
 Copyright 2026 Daniel Foo Jun Wei / Provenable.ai.
 
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use
-this software except in compliance with the License. You may obtain a copy of the
-License at http://www.apache.org/licenses/LICENSE-2.0
+The **source code** in this repository is licensed under the Apache License, Version
+2.0 — you may freely use, modify, and distribute it in compliance with the License.
+See [LICENSE](LICENSE) for full terms.
 
-Unless required by applicable law or agreed to in writing, software distributed
-under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-CONDITIONS OF ANY KIND, either express or implied. See the [LICENSE](LICENSE) file
-for the specific language governing permissions and limitations under the License.
+The **AEGX format specification** (`docs/SPEC.md`) is the original intellectual
+property of Daniel Foo Jun Wei / Provenable.ai and is provided for reference only.
+Creating independent or competing implementations of the AEGX format requires prior
+written permission. See [NOTICE](NOTICE) for details.
 
 "Provenable.ai", "Proven", "PRV", "AEGX", and "AER" are trademarks of
-Daniel Foo Jun Wei / Provenable.ai.
+Daniel Foo Jun Wei / Provenable.ai. For licensing inquiries: licensing@provenable.ai
