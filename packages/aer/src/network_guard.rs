@@ -226,12 +226,8 @@ pub fn check_outbound_request(
         }
     }
 
-    // Determine output taint
-    let output_taint = if !flags.is_empty() {
-        taint | TaintFlags::WEB_DERIVED
-    } else {
-        taint | TaintFlags::WEB_DERIVED
-    };
+    // All outbound responses carry WEB_DERIVED taint regardless of flags
+    let output_taint = taint | TaintFlags::WEB_DERIVED;
 
     NetworkCheckResult {
         verdict: GuardVerdict::Allow,
