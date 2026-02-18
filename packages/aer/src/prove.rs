@@ -408,15 +408,36 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     // Protection Summary
     let p = &response.protection;
     out.push_str("── Protection Summary ──────────────────────────────────────────\n\n");
-    out.push_str(&format!("  Threats Blocked:         {}\n", p.total_threats_blocked));
-    out.push_str(&format!("  CPI Violations Blocked:  {}\n", p.cpi_violations_blocked));
-    out.push_str(&format!("  MI Violations Blocked:   {}\n", p.mi_violations_blocked));
-    out.push_str(&format!("  Conversation Blocked:    {}\n", p.conversation_threats_blocked));
+    out.push_str(&format!(
+        "  Threats Blocked:         {}\n",
+        p.total_threats_blocked
+    ));
+    out.push_str(&format!(
+        "  CPI Violations Blocked:  {}\n",
+        p.cpi_violations_blocked
+    ));
+    out.push_str(&format!(
+        "  MI Violations Blocked:   {}\n",
+        p.mi_violations_blocked
+    ));
+    out.push_str(&format!(
+        "  Conversation Blocked:    {}\n",
+        p.conversation_threats_blocked
+    ));
     out.push_str(&format!("  Taint Blocks:            {}\n", p.taint_blocks));
-    out.push_str(&format!("  Proxy Misconfigs:        {}\n", p.proxy_misconfigs_detected));
+    out.push_str(&format!(
+        "  Proxy Misconfigs:        {}\n",
+        p.proxy_misconfigs_detected
+    ));
     out.push_str(&format!("  Auto-Rollbacks:          {}\n", p.auto_rollbacks));
-    out.push_str(&format!("  Rollback Recs:           {}\n", p.rollback_recommendations));
-    out.push_str(&format!("  Contamination Events:    {}\n", p.contamination_events));
+    out.push_str(&format!(
+        "  Rollback Recs:           {}\n",
+        p.rollback_recommendations
+    ));
+    out.push_str(&format!(
+        "  Contamination Events:    {}\n",
+        p.contamination_events
+    ));
     out.push_str(&format!("  Skills Verified:         {}\n", p.skills_verified));
     out.push_str(&format!(
         "  Protection Rate:         {:.1}%\n",

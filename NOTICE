@@ -1,0 +1,36 @@
+Provenable.ai
+Copyright 2026 Daniel Foo Jun Wei / Provenable.ai
+
+This product includes software developed by Daniel Foo Jun Wei / Provenable.ai.
+
+================================================================================
+AEGX Format Specification — Intellectual Property Notice
+================================================================================
+
+The AEGX (Agent Evidence eXchange) format specification, including but not
+limited to:
+
+  - The AEGX v0.1 specification (docs/SPEC.md)
+  - The AEGX_CANON_0_1 canonicalization algorithm
+  - The .aegx and .aegx.zip file extensions and bundle structure
+  - The manifest, record, and audit-entry JSON schemas
+  - The content-addressing and hash-chain verification algorithms
+
+is the original intellectual property of Daniel Foo Jun Wei / Provenable.ai.
+
+While the source code in this repository is licensed under the Apache License
+2.0, the AEGX format specification itself is provided for reference only.
+You may NOT use the AEGX specification to create independent or competing
+implementations of the AEGX format without prior written permission from
+Daniel Foo Jun Wei / Provenable.ai.
+
+For licensing inquiries regarding the AEGX format, contact: licensing@provenable.ai
+
+================================================================================
+Trademark Notice
+================================================================================
+
+"Provenable.ai", "Proven", "PRV", "AEGX", "AER", and associated logos are
+trademarks of Daniel Foo Jun Wei / Provenable.ai. This License does not grant
+permission to use these marks except as required for reasonable and customary
+use in describing the origin of the Work.

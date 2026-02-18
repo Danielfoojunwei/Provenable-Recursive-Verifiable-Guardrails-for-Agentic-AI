@@ -750,7 +750,16 @@ fuzz/                 # Fuzz testing targets
 
 ## License
 
-Copyright (c) 2026 Daniel Foo Jun Wei / Provenable.ai. All rights reserved.
+Copyright 2026 Daniel Foo Jun Wei / Provenable.ai.
 
-This software and the AEGX format specification are proprietary to Provenable.ai.
-See [LICENSE](LICENSE) for full terms. Use requires a written license agreement.
+The **source code** in this repository is licensed under the Apache License, Version
+2.0 — you may freely use, modify, and distribute it in compliance with the License.
+See [LICENSE](LICENSE) for full terms.
+
+The **AEGX format specification** (`docs/SPEC.md`) is the original intellectual
+property of Daniel Foo Jun Wei / Provenable.ai and is provided for reference only.
+Creating independent or competing implementations of the AEGX format requires prior
+written permission. See [NOTICE](NOTICE) for details.
+
+"Provenable.ai", "Proven", "PRV", "AEGX", and "AER" are trademarks of
+Daniel Foo Jun Wei / Provenable.ai. For licensing inquiries: licensing@provenable.ai
