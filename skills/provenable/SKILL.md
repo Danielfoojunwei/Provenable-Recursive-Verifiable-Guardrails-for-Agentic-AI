@@ -165,12 +165,15 @@ For channel-specific configuration and security best practices, see `{baseDir}/r
 
 ## Reference Files
 
-- **Full CLI reference:** Read `{baseDir}/references/cli-reference.md`
-- **Alert categories and severities:** Read `{baseDir}/references/alert-categories.md`
-- **CPI/MI guard policies:** Read `{baseDir}/references/guard-policies.md`
-- **Query patterns and examples:** Read `{baseDir}/references/query-patterns.md`
-- **Natural language query mapping:** Read `{baseDir}/references/chat-queries.md`
-- **Channel integration (Telegram, WhatsApp):** Read `{baseDir}/references/channel-integration.md`
+All reference documentation is consolidated in a single file:
+
+- **All references:** Read `{baseDir}/references/REFERENCES.md`
+  - [Alert Categories](#alert-categories) — threat categories, severities, taint flags, principal trust levels
+  - [Channel Integration](#channel-integration) — Telegram & WhatsApp guard behavior, config, session isolation
+  - [Chat Queries](#chat-queries) — natural language query mapping to commands
+  - [CLI Reference](#cli-reference) — full aegx and proven-aer command reference
+  - [Guard Policies](#guard-policies) — CPI/MI rules, file read guards, network egress rules
+  - [Query Patterns](#query-patterns) — query examples, JSON response structure, evidence workflows
 
 ## Common Chat Queries Mapped to Commands
 

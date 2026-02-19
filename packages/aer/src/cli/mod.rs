@@ -1,10 +1,6 @@
 pub mod bundle_cmd;
-pub mod init;
 pub mod prove_cmd;
-pub mod report_cmd;
-pub mod rollback_cmd;
 pub mod snapshot_cmd;
-pub mod verify_cmd;
 
 use clap::{Parser, Subcommand};
 
@@ -103,19 +99,19 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Init => init::run()?,
+        Commands::Init => init_run()?,
         Commands::Snapshot { action } => match action {
             SnapshotAction::Create { name, scope } => snapshot_cmd::create(&name, &scope)?,
             SnapshotAction::List => snapshot_cmd::list()?,
         },
-        Commands::Rollback { snapshot_id } => rollback_cmd::run(&snapshot_id)?,
+        Commands::Rollback { snapshot_id } => snapshot_cmd::rollback_run(&snapshot_id)?,
         Commands::Bundle { action } => match action {
             BundleAction::Export { agent, since } => {
                 bundle_cmd::export(agent.as_deref(), since.as_deref())?
             }
         },
-        Commands::Verify { bundle_path } => verify_cmd::run(&bundle_path)?,
-        Commands::Report { bundle_path } => report_cmd::run(&bundle_path)?,
+        Commands::Verify { bundle_path } => bundle_cmd::verify_run(&bundle_path)?,
+        Commands::Report { bundle_path } => prove_cmd::report_run(&bundle_path)?,
         Commands::Prove {
             since,
             until,
@@ -133,6 +129,43 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         )?,
         Commands::Status => status()?,
     }
+
+    Ok(())
+}
+
+fn init_run() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Initializing AER...");
+
+    // Create directory structure
+    crate::config::ensure_aer_dirs()?;
+    println!(
+        "  Created AER directories under {}",
+        crate::config::aer_root().display()
+    );
+
+    // Install default policy
+    let default = crate::policy::default_policy();
+    let policy_path = crate::config::default_policy_file();
+    crate::policy::save_policy(&default, &policy_path)?;
+    println!("  Installed default policy: {}", policy_path.display());
+
+    // Ensure workspace exists
+    crate::workspace::ensure_workspace()?;
+    println!(
+        "  Ensured workspace directory: {}",
+        crate::config::workspace_dir().display()
+    );
+
+    println!();
+    println!("AER initialized successfully.");
+    println!();
+    println!("Policy summary:");
+    println!("  - CPI: deny control-plane changes from non-USER/SYS principals");
+    println!("  - MI: deny memory writes with tainted provenance");
+    println!("  - MI: deny memory writes from untrusted principals");
+    println!("  - All read operations: allowed");
+    println!();
+    println!("State directory: {}", crate::config::resolve_state_dir().display());
 
     Ok(())
 }

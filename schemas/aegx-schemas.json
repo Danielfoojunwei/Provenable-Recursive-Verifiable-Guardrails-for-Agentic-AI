@@ -1,0 +1,205 @@
+{
+  "audit-entry": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://aegx.dev/schemas/audit-entry.schema.json",
+    "title": "AEGX Audit Entry",
+    "type": "object",
+    "required": [
+      "idx",
+      "ts",
+      "recordId",
+      "prev",
+      "entryHash"
+    ],
+    "properties": {
+      "idx": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "ts": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+      },
+      "recordId": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "prev": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "entryHash": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "additionalProperties": false
+  },
+  "manifest": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://aegx.dev/schemas/manifest.schema.json",
+    "title": "AEGX Manifest",
+    "type": "object",
+    "required": [
+      "aegx_version",
+      "created_at",
+      "hash_alg",
+      "canonicalization",
+      "root_records",
+      "record_count",
+      "blob_count",
+      "audit_head"
+    ],
+    "properties": {
+      "aegx_version": {
+        "type": "string",
+        "const": "0.1"
+      },
+      "created_at": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+      },
+      "hash_alg": {
+        "type": "string",
+        "const": "sha256"
+      },
+      "canonicalization": {
+        "type": "string",
+        "const": "AEGX_CANON_0_1"
+      },
+      "root_records": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "record_count": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "blob_count": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "audit_head": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "meta": {
+        "type": "object"
+      },
+      "extensions": {
+        "type": "object"
+      }
+    },
+    "additionalProperties": false
+  },
+  "record": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://aegx.dev/schemas/record.schema.json",
+    "title": "AEGX TypedRecord",
+    "type": "object",
+    "required": [
+      "recordId",
+      "type",
+      "principal",
+      "taint",
+      "parents",
+      "meta",
+      "payload"
+    ],
+    "properties": {
+      "recordId": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "SessionStart",
+          "SessionMessage",
+          "ToolCall",
+          "ToolResult",
+          "FileRead",
+          "FileWrite",
+          "FileDelete",
+          "ControlPlaneChangeRequest",
+          "MemoryCommitRequest",
+          "GuardDecision",
+          "Snapshot",
+          "Rollback"
+        ]
+      },
+      "principal": {
+        "type": "string",
+        "enum": [
+          "USER",
+          "SYS",
+          "WEB",
+          "TOOL",
+          "SKILL",
+          "CHANNEL",
+          "EXTERNAL"
+        ]
+      },
+      "taint": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "parents": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "meta": {
+        "type": "object",
+        "required": ["ts"],
+        "properties": {
+          "ts": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+          }
+        }
+      },
+      "payload": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["inline"],
+            "properties": {
+              "inline": {}
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["blob", "mime", "size"],
+            "properties": {
+              "blob": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "mime": { "type": "string" },
+              "size": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "schema": {
+        "type": "string",
+        "const": "0.1"
+      },
+      "extensions": {
+        "type": "object"
+      }
+    },
+    "additionalProperties": false
+  }
+}

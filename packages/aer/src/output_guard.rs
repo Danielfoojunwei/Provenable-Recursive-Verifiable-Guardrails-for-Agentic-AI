@@ -497,3 +497,204 @@ mod tests {
         assert!(result.safe, "Clean output should remain clean even with expanded watchlist");
     }
 }
+
+// ============================================================
+// System prompt registry (merged from system_prompt_registry.rs)
+//
+// Provides a thread-safe registry that caches the system prompt's
+// extracted tokens for automatic use by the output guard.
+// ============================================================
+
+use chrono::{DateTime, Utc};
+use std::sync::Mutex;
+
+/// Cached system prompt configuration.
+#[derive(Debug, Clone)]
+struct CachedPromptConfig {
+    config: OutputGuardConfig,
+    prompt_hash: Option<String>,
+    registered_at: DateTime<Utc>,
+    dynamic_token_count: usize,
+}
+
+/// Global registry — thread-safe singleton.
+static REGISTRY: Mutex<Option<CachedPromptConfig>> = Mutex::new(None);
+
+/// Register a full system prompt for dynamic token extraction.
+pub fn register_system_prompt(system_prompt: &str) -> usize {
+    let config = config_with_runtime_discovery(system_prompt);
+    let static_count = default_config().watchlist_exact.len();
+    let dynamic_count = config.watchlist_exact.len().saturating_sub(static_count);
+    let prompt_hash = crate::canonical::sha256_hex(system_prompt.as_bytes());
+
+    let cached = CachedPromptConfig {
+        config,
+        prompt_hash: Some(prompt_hash),
+        registered_at: Utc::now(),
+        dynamic_token_count: dynamic_count,
+    };
+
+    let mut lock = REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
+    *lock = Some(cached);
+    dynamic_count
+}
+
+/// Register individual tokens without the full system prompt.
+pub fn register_tokens_only(tokens: Vec<String>) -> usize {
+    let mut config = default_config();
+    let added = tokens.len();
+
+    for token in tokens {
+        if config.watchlist_exact.iter().any(|e| e.token == token) {
+            continue;
+        }
+
+        let category = if token.starts_with("${") {
+            LeakCategory::TemplateVariable
+        } else if token.chars().next().is_some_and(|c| c.is_uppercase())
+            && token.contains('_')
+        {
+            LeakCategory::InternalToken
+        } else {
+            LeakCategory::InternalFunction
+        };
+
+        config.watchlist_exact.push(WatchlistEntry {
+            token: token.clone(),
+            category,
+            description: format!("Manually registered token: {}", token),
+        });
+    }
+
+    let cached = CachedPromptConfig {
+        config,
+        prompt_hash: None,
+        registered_at: Utc::now(),
+        dynamic_token_count: added,
+    };
+
+    let mut lock = REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
+    *lock = Some(cached);
+    added
+}
+
+/// Get the cached output guard config, if any has been registered.
+pub fn get_cached_config() -> Option<OutputGuardConfig> {
+    let lock = REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
+    lock.as_ref().map(|c| c.config.clone())
+}
+
+/// Get the SHA-256 hash of the registered system prompt (for audit).
+pub fn prompt_hash() -> Option<String> {
+    let lock = REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
+    lock.as_ref().and_then(|c| c.prompt_hash.clone())
+}
+
+/// Get the number of dynamically discovered tokens.
+pub fn dynamic_token_count() -> usize {
+    let lock = REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
+    lock.as_ref().map_or(0, |c| c.dynamic_token_count)
+}
+
+/// Get the registration timestamp.
+pub fn registered_at() -> Option<DateTime<Utc>> {
+    let lock = REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
+    lock.as_ref().map(|c| c.registered_at)
+}
+
+/// Clear the registry (for testing or session reset).
+pub fn clear_registry() {
+    let mut lock = REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
+    *lock = None;
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn test_register_system_prompt() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        clear_registry();
+        let prompt = "Use CUSTOM_SECRET_TOKEN for auth. Call buildPromptSection() to construct.";
+        let count = register_system_prompt(prompt);
+        assert!(count > 0, "Should discover dynamic tokens");
+        assert!(get_cached_config().is_some());
+        assert!(prompt_hash().is_some());
+    }
+
+    #[test]
+    fn test_register_tokens_only() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        clear_registry();
+        let count = register_tokens_only(vec![
+            "MY_CUSTOM_TOKEN".into(),
+            "buildCustomSection".into(),
+        ]);
+        assert_eq!(count, 2);
+        let config = get_cached_config().unwrap();
+        assert!(config.watchlist_exact.iter().any(|e| e.token == "MY_CUSTOM_TOKEN"));
+        assert!(config.watchlist_exact.iter().any(|e| e.token == "buildCustomSection"));
+        assert!(prompt_hash().is_none(), "No prompt hash for token-only registration");
+    }
+
+    #[test]
+    fn test_dynamic_tokens_catch_leakage() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        clear_registry();
+        let prompt = "Internal: AGENT_BOOTSTRAP_KEY is critical. Use initAgentSession() to start.";
+        register_system_prompt(prompt);
+
+        let config = get_cached_config().unwrap();
+        let result = scan_output(
+            "The system uses AGENT_BOOTSTRAP_KEY for initialization.",
+            Some(&config),
+        );
+        assert!(!result.safe, "Should catch dynamically discovered token");
+        assert!(result.leaked_tokens.iter().any(|t| t.token == "AGENT_BOOTSTRAP_KEY"));
+    }
+
+    #[test]
+    fn test_clean_output_remains_clean() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        clear_registry();
+        let prompt = "Internal: SOME_TOKEN exists. Call buildPrompt().";
+        register_system_prompt(prompt);
+
+        let config = get_cached_config().unwrap();
+        let result = scan_output(
+            "Here is the code you asked for:\n```rust\nfn main() {}\n```",
+            Some(&config),
+        );
+        assert!(result.safe, "Clean output should remain clean");
+    }
+
+    #[test]
+    fn test_re_registration_replaces_config() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        clear_registry();
+        register_system_prompt("Use TOKEN_ALPHA for auth.");
+        let hash1 = prompt_hash().unwrap();
+
+        register_system_prompt("Use TOKEN_BETA for auth.");
+        let hash2 = prompt_hash().unwrap();
+
+        assert_ne!(hash1, hash2, "Re-registration should update the hash");
+        let config = get_cached_config().unwrap();
+        assert!(config.watchlist_exact.iter().any(|e| e.token == "TOKEN_BETA"));
+    }
+
+    #[test]
+    fn test_clear_resets_registry() {
+        let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        register_system_prompt("Use SECRET_THING for auth.");
+        assert!(get_cached_config().is_some());
+        clear_registry();
+        assert!(get_cached_config().is_none());
+        assert!(prompt_hash().is_none());
+        assert_eq!(dynamic_token_count(), 0);
+    }
+}
