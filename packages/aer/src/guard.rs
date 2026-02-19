@@ -1,7 +1,7 @@
 use crate::alerts::{self, ThreatCategory};
 use crate::audit_chain;
 use crate::config;
-use crate::metrics::EvalTimer;
+use crate::prove::EvalTimer;
 use crate::policy;
 use crate::records;
 use crate::types::*;
@@ -267,7 +267,7 @@ impl Guard {
 
         // Conversation-level state analysis (Conversational Noninterference Corollary)
         // Detects crescendo attacks that distribute extraction intent across messages.
-        let conv_analysis = crate::conversation_state::analyze_in_context(
+        let conv_analysis = crate::scanner::analyze_in_context(
             session_id, content, &scan_result,
         );
 
@@ -393,7 +393,7 @@ impl Guard {
 
         // Fallback chain: explicit config > registry cache > static default
         let registry_config = if config.is_none() {
-            crate::system_prompt_registry::get_cached_config()
+            crate::output_guard::get_cached_config()
         } else {
             None
         };

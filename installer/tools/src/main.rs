@@ -1,9 +1,7 @@
 use clap::{Parser, Subcommand};
 
 mod manifest;
-mod validate;
-mod checksums;
-mod pin;
+mod commands;
 
 #[derive(Parser)]
 #[command(name = "installer-tools")]
@@ -48,14 +46,14 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Validate { manifest } => validate::run(manifest),
-        Commands::GenChecksums { repo_root } => checksums::run(repo_root),
+        Commands::Validate { manifest } => commands::validate_run(manifest),
+        Commands::GenChecksums { repo_root } => commands::checksums_run(repo_root),
         Commands::PinVersion {
             version,
             set_default,
             skip_npm_check,
             repo_root,
-        } => pin::run(version, set_default, skip_npm_check, repo_root),
+        } => commands::pin_run(version, set_default, skip_npm_check, repo_root),
     };
 
     if let Err(e) = result {

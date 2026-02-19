@@ -1,5 +1,4 @@
-use crate::agent_notifications::{self as notif};
-use crate::alerts;
+use crate::alerts::{self as notif};
 use crate::audit_chain;
 use crate::canonical::sha256_hex;
 use crate::config;
@@ -388,7 +387,7 @@ pub fn check_proxy_trust(
         audit_chain::emit_audit(&record.record_id)?;
 
         // Emit proxy misconfiguration alert and notify agent
-        if let Ok(_alert) = alerts::emit_proxy_alert(trusted_proxies, gateway_addr, &record.record_id) {
+        if let Ok(_alert) = notif::emit_proxy_alert(trusted_proxies, gateway_addr, &record.record_id) {
             notif::notify_proxy_misconfig(trusted_proxies, gateway_addr);
         }
 
@@ -492,8 +491,8 @@ pub fn on_skill_install(
             principal,
             taint: record_taint,
         };
-        if let Err(e) = alerts::emit_alert(
-            alerts::ThreatCategory::CpiViolation,
+        if let Err(e) = notif::emit_alert(
+            notif::ThreatCategory::CpiViolation,
             &detail,
             &record.record_id,
             &package.name,
@@ -723,8 +722,8 @@ pub fn on_system_prompt_available(
     session_id: &str,
     system_prompt: &str,
 ) -> io::Result<TypedRecord> {
-    let token_count = crate::system_prompt_registry::register_system_prompt(system_prompt);
-    let prompt_hash = crate::system_prompt_registry::prompt_hash()
+    let token_count = crate::output_guard::register_system_prompt(system_prompt);
+    let prompt_hash = crate::output_guard::prompt_hash()
         .unwrap_or_else(|| "unknown".to_string());
 
     let mut meta = RecordMeta::now();
