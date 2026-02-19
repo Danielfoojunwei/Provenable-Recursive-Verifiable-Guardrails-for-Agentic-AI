@@ -3,8 +3,7 @@ use serde_json::Value;
 use std::io::{BufRead, Write};
 use std::path::Path;
 
-use crate::canonical::{canonical_json, normalize_timestamp};
-use crate::hash::sha256_hex;
+use crate::canonical::{canonical_json, normalize_timestamp, sha256_hex};
 
 /// Record type enum for AEGX v0.1
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

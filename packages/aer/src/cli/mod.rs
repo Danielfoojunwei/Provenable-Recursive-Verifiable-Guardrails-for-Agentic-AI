@@ -1,6 +1,4 @@
-pub mod bundle_cmd;
-pub mod prove_cmd;
-pub mod snapshot_cmd;
+pub mod handlers;
 
 use clap::{Parser, Subcommand};
 
@@ -101,17 +99,17 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Commands::Init => init_run()?,
         Commands::Snapshot { action } => match action {
-            SnapshotAction::Create { name, scope } => snapshot_cmd::create(&name, &scope)?,
-            SnapshotAction::List => snapshot_cmd::list()?,
+            SnapshotAction::Create { name, scope } => handlers::snapshot_create(&name, &scope)?,
+            SnapshotAction::List => handlers::snapshot_list()?,
         },
-        Commands::Rollback { snapshot_id } => snapshot_cmd::rollback_run(&snapshot_id)?,
+        Commands::Rollback { snapshot_id } => handlers::snapshot_rollback(&snapshot_id)?,
         Commands::Bundle { action } => match action {
             BundleAction::Export { agent, since } => {
-                bundle_cmd::export(agent.as_deref(), since.as_deref())?
+                handlers::bundle_export(agent.as_deref(), since.as_deref())?
             }
         },
-        Commands::Verify { bundle_path } => bundle_cmd::verify_run(&bundle_path)?,
-        Commands::Report { bundle_path } => prove_cmd::report_run(&bundle_path)?,
+        Commands::Verify { bundle_path } => handlers::bundle_verify(&bundle_path)?,
+        Commands::Report { bundle_path } => handlers::prove_report(&bundle_path)?,
         Commands::Prove {
             since,
             until,
@@ -119,7 +117,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             severity,
             limit,
             json,
-        } => prove_cmd::run(
+        } => handlers::prove_run(
             since.as_deref(),
             until.as_deref(),
             category.as_deref(),
