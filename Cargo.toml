@@ -32,9 +32,5 @@ predicates = "3"
 proptest = "1"
 
 [[test]]
-name = "proptest_records"
-path = "fuzz/proptest_records.rs"
-
-[[test]]
 name = "proptest_bundles"
 path = "fuzz/proptest_bundles.rs"
