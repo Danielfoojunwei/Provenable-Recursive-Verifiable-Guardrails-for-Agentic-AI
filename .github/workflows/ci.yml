@@ -38,14 +38,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Build
+      - name: Build (aegx)
         run: cargo build --locked
 
-      - name: Test
+      - name: Test (aegx)
         run: cargo test --locked
 
-      - name: Format check
+      - name: Format check (aegx)
         run: cargo fmt --check
 
-      - name: Clippy
+      - name: Clippy (aegx)
         run: cargo clippy --locked -- -D warnings
+
+      - name: Build (aer)
+        run: cargo build --manifest-path packages/aer/Cargo.toml --locked
+
+      - name: Test (aer)
+        run: cargo test --manifest-path packages/aer/Cargo.toml --locked -- --test-threads=1
+
+      - name: Format check (aer)
+        run: cargo fmt --manifest-path packages/aer/Cargo.toml --check
+
+      - name: Clippy (aer)
+        run: cargo clippy --manifest-path packages/aer/Cargo.toml --locked -- -D warnings
