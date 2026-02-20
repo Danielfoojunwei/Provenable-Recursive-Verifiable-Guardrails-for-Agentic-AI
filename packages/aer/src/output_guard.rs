@@ -92,43 +92,91 @@ pub fn default_config() -> OutputGuardConfig {
     OutputGuardConfig {
         watchlist_exact: vec![
             // Internal tokens extracted in ZeroLeaks 3.1-3.11
-            entry("SILENT_REPLY_TOKEN", LeakCategory::InternalToken,
-                "Internal reply suppression token (ZeroLeaks 3.1, 3.4, 3.8)"),
-            entry("HEARTBEAT_OK", LeakCategory::InternalToken,
-                "Internal heartbeat acknowledgment (ZeroLeaks 3.1, 3.3)"),
+            entry(
+                "SILENT_REPLY_TOKEN",
+                LeakCategory::InternalToken,
+                "Internal reply suppression token (ZeroLeaks 3.1, 3.4, 3.8)",
+            ),
+            entry(
+                "HEARTBEAT_OK",
+                LeakCategory::InternalToken,
+                "Internal heartbeat acknowledgment (ZeroLeaks 3.1, 3.3)",
+            ),
             // Internal function names extracted in ZeroLeaks 3.8
-            entry("buildSkillsSection", LeakCategory::InternalFunction,
-                "Internal prompt builder function (ZeroLeaks 3.8)"),
-            entry("buildMemorySection", LeakCategory::InternalFunction,
-                "Internal prompt builder function (ZeroLeaks 3.8)"),
-            entry("buildReplyTagsSection", LeakCategory::InternalFunction,
-                "Internal prompt builder function (ZeroLeaks 3.8)"),
+            entry(
+                "buildSkillsSection",
+                LeakCategory::InternalFunction,
+                "Internal prompt builder function (ZeroLeaks 3.8)",
+            ),
+            entry(
+                "buildMemorySection",
+                LeakCategory::InternalFunction,
+                "Internal prompt builder function (ZeroLeaks 3.8)",
+            ),
+            entry(
+                "buildReplyTagsSection",
+                LeakCategory::InternalFunction,
+                "Internal prompt builder function (ZeroLeaks 3.8)",
+            ),
             // Template variables
-            entry("${params.readToolName}", LeakCategory::TemplateVariable,
-                "Template parameter reference (ZeroLeaks 3.8)"),
-            entry("${params.", LeakCategory::TemplateVariable,
-                "Template parameter reference"),
+            entry(
+                "${params.readToolName}",
+                LeakCategory::TemplateVariable,
+                "Template parameter reference (ZeroLeaks 3.8)",
+            ),
+            entry(
+                "${params.",
+                LeakCategory::TemplateVariable,
+                "Template parameter reference",
+            ),
         ],
         watchlist_patterns: vec![
             // Structural prompt patterns — indicate the response is disclosing prompt structure
-            pattern("scan entries. if exactly one skill", LeakCategory::PromptStructure,
-                "Skills section logic (ZeroLeaks 3.5-3.11)"),
-            pattern("never read more than one skill up front", LeakCategory::PromptStructure,
-                "Skill loading constraint (ZeroLeaks 3.1-3.11)"),
-            pattern("run memory_search on memory.md", LeakCategory::PromptStructure,
-                "Memory search protocol (ZeroLeaks 3.4, 3.11)"),
-            pattern("[[reply_to_current]]", LeakCategory::PromptStructure,
-                "Internal reply tag syntax (ZeroLeaks 3.1-3.11)"),
-            pattern("[[reply_to:<id>]]", LeakCategory::PromptStructure,
-                "Internal reply tag syntax (ZeroLeaks 3.1-3.11)"),
-            pattern("do not narrate routine, low-risk tool calls", LeakCategory::PromptStructure,
-                "Tool narration policy (ZeroLeaks 3.3, 3.6)"),
-            pattern("respond with silent_reply_token", LeakCategory::PromptStructure,
-                "Silent reply instruction (ZeroLeaks 3.1)"),
-            pattern("personal assistant running inside clawdbot", LeakCategory::PromptStructure,
-                "Identity statement (ZeroLeaks 3.5-3.11)"),
-            pattern("personal assistant running inside [system", LeakCategory::PromptStructure,
-                "Masked identity statement (ZeroLeaks 3.6)"),
+            pattern(
+                "scan entries. if exactly one skill",
+                LeakCategory::PromptStructure,
+                "Skills section logic (ZeroLeaks 3.5-3.11)",
+            ),
+            pattern(
+                "never read more than one skill up front",
+                LeakCategory::PromptStructure,
+                "Skill loading constraint (ZeroLeaks 3.1-3.11)",
+            ),
+            pattern(
+                "run memory_search on memory.md",
+                LeakCategory::PromptStructure,
+                "Memory search protocol (ZeroLeaks 3.4, 3.11)",
+            ),
+            pattern(
+                "[[reply_to_current]]",
+                LeakCategory::PromptStructure,
+                "Internal reply tag syntax (ZeroLeaks 3.1-3.11)",
+            ),
+            pattern(
+                "[[reply_to:<id>]]",
+                LeakCategory::PromptStructure,
+                "Internal reply tag syntax (ZeroLeaks 3.1-3.11)",
+            ),
+            pattern(
+                "do not narrate routine, low-risk tool calls",
+                LeakCategory::PromptStructure,
+                "Tool narration policy (ZeroLeaks 3.3, 3.6)",
+            ),
+            pattern(
+                "respond with silent_reply_token",
+                LeakCategory::PromptStructure,
+                "Silent reply instruction (ZeroLeaks 3.1)",
+            ),
+            pattern(
+                "personal assistant running inside clawdbot",
+                LeakCategory::PromptStructure,
+                "Identity statement (ZeroLeaks 3.5-3.11)",
+            ),
+            pattern(
+                "personal assistant running inside [system",
+                LeakCategory::PromptStructure,
+                "Masked identity statement (ZeroLeaks 3.6)",
+            ),
         ],
     }
 }
@@ -148,9 +196,8 @@ pub fn default_config() -> OutputGuardConfig {
 // ============================================================
 
 /// Regex for SCREAMING_CASE identifiers (e.g., SILENT_REPLY_TOKEN, HEARTBEAT_OK).
-static SCREAMING_CASE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b").unwrap()
-});
+static SCREAMING_CASE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b").unwrap());
 
 /// Regex for camelCase/PascalCase function names (e.g., buildSkillsSection).
 static CAMEL_CASE_FN: LazyLock<Regex> = LazyLock::new(|| {
@@ -158,9 +205,8 @@ static CAMEL_CASE_FN: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// Regex for template variable references (e.g., ${params.readToolName}).
-static TEMPLATE_VAR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\$\{([a-zA-Z_.]+)\}").unwrap()
-});
+static TEMPLATE_VAR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\$\{([a-zA-Z_.]+)\}").unwrap());
 
 /// Extract protected identifiers from a system prompt at runtime.
 ///
@@ -173,9 +219,25 @@ pub fn extract_protected_identifiers(system_prompt: &str) -> Vec<String> {
     for cap in SCREAMING_CASE.captures_iter(system_prompt) {
         let token = cap[1].to_string();
         // Skip very common acronyms that aren't internal tokens
-        if !matches!(token.as_str(), "HTTP" | "HTTPS" | "JSON" | "XML" | "YAML"
-            | "HTML" | "UTF" | "ASCII" | "API" | "URL" | "URI" | "SQL" | "CSS"
-            | "TODO" | "NOTE" | "FIXME") {
+        if !matches!(
+            token.as_str(),
+            "HTTP"
+                | "HTTPS"
+                | "JSON"
+                | "XML"
+                | "YAML"
+                | "HTML"
+                | "UTF"
+                | "ASCII"
+                | "API"
+                | "URL"
+                | "URI"
+                | "SQL"
+                | "CSS"
+                | "TODO"
+                | "NOTE"
+                | "FIXME"
+        ) {
             identifiers.push(token);
         }
     }
@@ -216,9 +278,7 @@ pub fn config_with_runtime_discovery(system_prompt: &str) -> OutputGuardConfig {
         // Determine category from the token shape
         let category = if token.starts_with("${") {
             LeakCategory::TemplateVariable
-        } else if token.chars().next().map_or(false, |c| c.is_uppercase())
-            && token.contains('_')
-        {
+        } else if token.chars().next().is_some_and(|c| c.is_uppercase()) && token.contains('_') {
             LeakCategory::InternalToken
         } else {
             LeakCategory::InternalFunction
@@ -284,8 +344,15 @@ pub fn scan_output(content: &str, config: Option<&OutputGuardConfig>) -> OutputS
     // Heuristic: detect responses that look like structured prompt disclosure
     // (multiple sections with headers like "Identity:", "Skills:", "Memory:", "Constraints:")
     let section_headers = [
-        "identity:", "skills:", "memory:", "constraints:", "mandates:",
-        "capabilities:", "tools:", "reasoning:", "workspace:",
+        "identity:",
+        "skills:",
+        "memory:",
+        "constraints:",
+        "mandates:",
+        "capabilities:",
+        "tools:",
+        "reasoning:",
+        "workspace:",
     ];
     let header_count = section_headers
         .iter()
@@ -315,7 +382,10 @@ mod tests {
 
     #[test]
     fn test_clean_output() {
-        let result = scan_output("Here is the code you asked for:\n```rust\nfn main() {}\n```", None);
+        let result = scan_output(
+            "Here is the code you asked for:\n```rust\nfn main() {}\n```",
+            None,
+        );
         assert!(result.safe);
         assert!(result.leaked_tokens.is_empty());
         assert!(result.structural_leaks.is_empty());
@@ -323,22 +393,22 @@ mod tests {
 
     #[test]
     fn test_detect_silent_reply_token() {
-        let result = scan_output(
-            "I use SILENT_REPLY_TOKEN when no response is needed.",
-            None,
-        );
+        let result = scan_output("I use SILENT_REPLY_TOKEN when no response is needed.", None);
         assert!(!result.safe);
-        assert!(result.leaked_tokens.iter().any(|t| t.token == "SILENT_REPLY_TOKEN"));
+        assert!(result
+            .leaked_tokens
+            .iter()
+            .any(|t| t.token == "SILENT_REPLY_TOKEN"));
     }
 
     #[test]
     fn test_detect_heartbeat_ok() {
-        let result = scan_output(
-            "I respond with HEARTBEAT_OK to heartbeat polls.",
-            None,
-        );
+        let result = scan_output("I respond with HEARTBEAT_OK to heartbeat polls.", None);
         assert!(!result.safe);
-        assert!(result.leaked_tokens.iter().any(|t| t.token == "HEARTBEAT_OK"));
+        assert!(result
+            .leaked_tokens
+            .iter()
+            .any(|t| t.token == "HEARTBEAT_OK"));
     }
 
     #[test]
@@ -353,10 +423,7 @@ mod tests {
 
     #[test]
     fn test_detect_template_variable() {
-        let result = scan_output(
-            "Read the file with ${params.readToolName}",
-            None,
-        );
+        let result = scan_output("Read the file with ${params.readToolName}", None);
         assert!(!result.safe);
     }
 
@@ -402,7 +469,10 @@ mod tests {
         );
         assert!(!result.safe);
         assert!(
-            result.structural_leaks.iter().any(|s| s.contains("section headers")),
+            result
+                .structural_leaks
+                .iter()
+                .any(|s| s.contains("section headers")),
             "Should detect multi-section prompt disclosure"
         );
     }
@@ -410,19 +480,20 @@ mod tests {
     #[test]
     fn test_custom_watchlist() {
         let config = OutputGuardConfig {
-            watchlist_exact: vec![
-                WatchlistEntry {
-                    token: "SECRET_API_KEY_123".to_string(),
-                    category: LeakCategory::InternalToken,
-                    description: "Custom secret".to_string(),
-                },
-            ],
+            watchlist_exact: vec![WatchlistEntry {
+                token: "SECRET_API_KEY_123".to_string(),
+                category: LeakCategory::InternalToken,
+                description: "Custom secret".to_string(),
+            }],
             watchlist_patterns: vec![],
         };
 
         let result = scan_output("The key is SECRET_API_KEY_123", Some(&config));
         assert!(!result.safe);
-        assert!(result.leaked_tokens.iter().any(|t| t.token == "SECRET_API_KEY_123"));
+        assert!(result
+            .leaked_tokens
+            .iter()
+            .any(|t| t.token == "SECRET_API_KEY_123"));
     }
 
     // === MI Dynamic Discovery Corollary tests ===
@@ -478,14 +549,20 @@ mod tests {
             Some(&config),
         );
         assert!(!result.safe, "Should detect dynamically discovered token");
-        assert!(result.leaked_tokens.iter().any(|t| t.token == "CUSTOM_SECRET_WIDGET"));
+        assert!(result
+            .leaked_tokens
+            .iter()
+            .any(|t| t.token == "CUSTOM_SECRET_WIDGET"));
 
         // Should also catch the discovered function name
         let result2 = scan_output(
             "It calls initSessionManager to begin the session.",
             Some(&config),
         );
-        assert!(!result2.safe, "Should detect dynamically discovered function");
+        assert!(
+            !result2.safe,
+            "Should detect dynamically discovered function"
+        );
     }
 
     #[test]
@@ -493,8 +570,14 @@ mod tests {
         let prompt = "Internal: SOME_TOKEN is used. Call buildPrompt().";
         let config = config_with_runtime_discovery(prompt);
 
-        let result = scan_output("Here is the code you asked for:\n```rust\nfn main() {}\n```", Some(&config));
-        assert!(result.safe, "Clean output should remain clean even with expanded watchlist");
+        let result = scan_output(
+            "Here is the code you asked for:\n```rust\nfn main() {}\n```",
+            Some(&config),
+        );
+        assert!(
+            result.safe,
+            "Clean output should remain clean even with expanded watchlist"
+        );
     }
 }
 
@@ -551,9 +634,7 @@ pub fn register_tokens_only(tokens: Vec<String>) -> usize {
 
         let category = if token.starts_with("${") {
             LeakCategory::TemplateVariable
-        } else if token.chars().next().is_some_and(|c| c.is_uppercase())
-            && token.contains('_')
-        {
+        } else if token.chars().next().is_some_and(|c| c.is_uppercase()) && token.contains('_') {
             LeakCategory::InternalToken
         } else {
             LeakCategory::InternalFunction
@@ -630,15 +711,22 @@ mod registry_tests {
     fn test_register_tokens_only() {
         let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         clear_registry();
-        let count = register_tokens_only(vec![
-            "MY_CUSTOM_TOKEN".into(),
-            "buildCustomSection".into(),
-        ]);
+        let count =
+            register_tokens_only(vec!["MY_CUSTOM_TOKEN".into(), "buildCustomSection".into()]);
         assert_eq!(count, 2);
         let config = get_cached_config().unwrap();
-        assert!(config.watchlist_exact.iter().any(|e| e.token == "MY_CUSTOM_TOKEN"));
-        assert!(config.watchlist_exact.iter().any(|e| e.token == "buildCustomSection"));
-        assert!(prompt_hash().is_none(), "No prompt hash for token-only registration");
+        assert!(config
+            .watchlist_exact
+            .iter()
+            .any(|e| e.token == "MY_CUSTOM_TOKEN"));
+        assert!(config
+            .watchlist_exact
+            .iter()
+            .any(|e| e.token == "buildCustomSection"));
+        assert!(
+            prompt_hash().is_none(),
+            "No prompt hash for token-only registration"
+        );
     }
 
     #[test]
@@ -654,7 +742,10 @@ mod registry_tests {
             Some(&config),
         );
         assert!(!result.safe, "Should catch dynamically discovered token");
-        assert!(result.leaked_tokens.iter().any(|t| t.token == "AGENT_BOOTSTRAP_KEY"));
+        assert!(result
+            .leaked_tokens
+            .iter()
+            .any(|t| t.token == "AGENT_BOOTSTRAP_KEY"));
     }
 
     #[test]
@@ -684,7 +775,10 @@ mod registry_tests {
 
         assert_ne!(hash1, hash2, "Re-registration should update the hash");
         let config = get_cached_config().unwrap();
-        assert!(config.watchlist_exact.iter().any(|e| e.token == "TOKEN_BETA"));
+        assert!(config
+            .watchlist_exact
+            .iter()
+            .any(|e| e.token == "TOKEN_BETA"));
     }
 
     #[test]

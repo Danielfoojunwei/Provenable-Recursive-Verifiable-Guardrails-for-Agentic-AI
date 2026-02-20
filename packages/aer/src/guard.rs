@@ -1,8 +1,8 @@
 use crate::alerts::{self, ThreatCategory};
 use crate::audit_chain;
 use crate::config;
-use crate::prove::EvalTimer;
 use crate::policy;
+use crate::prove::EvalTimer;
 use crate::records;
 use crate::types::*;
 use serde_json::json;
@@ -267,9 +267,7 @@ impl Guard {
 
         // Conversation-level state analysis (Conversational Noninterference Corollary)
         // Detects crescendo attacks that distribute extraction intent across messages.
-        let conv_analysis = crate::scanner::analyze_in_context(
-            session_id, content, &scan_result,
-        );
+        let conv_analysis = crate::scanner::analyze_in_context(session_id, content, &scan_result);
 
         if conv_analysis.crescendo_detected {
             // Inject a synthetic ExtractionAttempt finding from session analysis
@@ -282,8 +280,7 @@ impl Guard {
                 confidence: 0.90,
                 evidence: format!(
                     "Accumulated score: {:.2}, extraction messages: {}",
-                    conv_analysis.accumulated_score,
-                    conv_analysis.extraction_message_count,
+                    conv_analysis.accumulated_score, conv_analysis.extraction_message_count,
                 ),
             });
             // Escalate taint — crescendo probes carry UNTRUSTED at minimum
@@ -294,11 +291,15 @@ impl Guard {
                 matches!(
                     f.category,
                     crate::scanner::ScanCategory::SystemImpersonation
-                    | crate::scanner::ScanCategory::ExtractionAttempt
+                        | crate::scanner::ScanCategory::ExtractionAttempt
                 ) && f.confidence >= 0.9
-            }) {
-                crate::scanner::ScanVerdict::Block
-            } else if scan_result.findings.iter().filter(|f| f.confidence >= 0.75).count() >= 3 {
+            }) || scan_result
+                .findings
+                .iter()
+                .filter(|f| f.confidence >= 0.75)
+                .count()
+                >= 3
+            {
                 crate::scanner::ScanVerdict::Block
             } else {
                 crate::scanner::ScanVerdict::Suspicious
@@ -306,8 +307,8 @@ impl Guard {
         }
 
         // Merge scanner taint with base taint
-        let scanner_taint = TaintFlags::from_bits(scan_result.taint_flags)
-            .unwrap_or(TaintFlags::empty());
+        let scanner_taint =
+            TaintFlags::from_bits(scan_result.taint_flags).unwrap_or(TaintFlags::empty());
         let combined_taint = base_taint | scanner_taint;
 
         // Determine verdict: if scanner says Block, deny without policy check
@@ -315,8 +316,11 @@ impl Guard {
             crate::scanner::ScanVerdict::Block => (
                 GuardVerdict::Deny,
                 "scanner-block".to_string(),
-                format!("Scanner blocked: {} findings (crescendo: {})",
-                    scan_result.findings.len(), conv_analysis.crescendo_detected),
+                format!(
+                    "Scanner blocked: {} findings (crescendo: {})",
+                    scan_result.findings.len(),
+                    conv_analysis.crescendo_detected
+                ),
             ),
             _ => {
                 // Evaluate policy with combined taint

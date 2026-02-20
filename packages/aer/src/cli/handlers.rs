@@ -113,11 +113,17 @@ pub fn prove_run(
             "PROXY" | "PROXY_MISCONFIG" => Ok(crate::alerts::ThreatCategory::ProxyMisconfig),
             "RATE_LIMIT" => Ok(crate::alerts::ThreatCategory::RateLimitExceeded),
             "INJECTION" => Ok(crate::alerts::ThreatCategory::InjectionSuspect),
-            "EXTRACTION" | "PROMPT_EXTRACTION" => Ok(crate::alerts::ThreatCategory::PromptExtraction),
+            "EXTRACTION" | "PROMPT_EXTRACTION" => {
+                Ok(crate::alerts::ThreatCategory::PromptExtraction)
+            }
             "LEAKAGE" | "PROMPT_LEAKAGE" => Ok(crate::alerts::ThreatCategory::PromptLeakage),
-            "ROLLBACK" | "ROLLBACK_RECOMMENDED" => Ok(crate::alerts::ThreatCategory::RollbackRecommended),
+            "ROLLBACK" | "ROLLBACK_RECOMMENDED" => {
+                Ok(crate::alerts::ThreatCategory::RollbackRecommended)
+            }
             "AUTO_ROLLBACK" => Ok(crate::alerts::ThreatCategory::AutoRollback),
-            "CONTAMINATION" | "CONTAMINATION_DETECTED" => Ok(crate::alerts::ThreatCategory::ContaminationDetected),
+            "CONTAMINATION" | "CONTAMINATION_DETECTED" => {
+                Ok(crate::alerts::ThreatCategory::ContaminationDetected)
+            }
             _ => Err(format!(
                 "Unknown category '{}'. Valid: CPI, MI, TAINT, PROXY, RATE_LIMIT, INJECTION, \
                  EXTRACTION, LEAKAGE, ROLLBACK, AUTO_ROLLBACK, CONTAMINATION",

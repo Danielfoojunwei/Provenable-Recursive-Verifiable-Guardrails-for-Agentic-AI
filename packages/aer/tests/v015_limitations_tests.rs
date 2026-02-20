@@ -28,7 +28,11 @@ mod system_prompt_registry {
                       Call buildContextSection() for context assembly. \
                       Template: ${params.toolConfig}.";
         let count = system_prompt_registry::register_system_prompt(prompt);
-        assert!(count >= 2, "Should discover at least 2 dynamic tokens, got {}", count);
+        assert!(
+            count >= 2,
+            "Should discover at least 2 dynamic tokens, got {}",
+            count
+        );
 
         // Now the output guard should catch these tokens automatically
         let config = system_prompt_registry::get_cached_config().unwrap();
@@ -39,7 +43,10 @@ mod system_prompt_registry {
             Some(&config),
         );
         assert!(!result.safe, "Should catch INTERNAL_BOOTSTRAP_VECTOR");
-        assert!(result.leaked_tokens.iter().any(|t| t.token == "INTERNAL_BOOTSTRAP_VECTOR"));
+        assert!(result
+            .leaked_tokens
+            .iter()
+            .any(|t| t.token == "INTERNAL_BOOTSTRAP_VECTOR"));
 
         // Test: camelCase function is caught
         let result2 = output_guard::scan_output(
@@ -71,9 +78,18 @@ mod system_prompt_registry {
         ]);
 
         let config = system_prompt_registry::get_cached_config().unwrap();
-        assert!(config.watchlist_exact.iter().any(|e| e.token == "SKILL_AUTH_NONCE"));
-        assert!(config.watchlist_exact.iter().any(|e| e.token == "parseManifestConfig"));
-        assert!(config.watchlist_exact.iter().any(|e| e.token == "${runtime.secretKey}"));
+        assert!(config
+            .watchlist_exact
+            .iter()
+            .any(|e| e.token == "SKILL_AUTH_NONCE"));
+        assert!(config
+            .watchlist_exact
+            .iter()
+            .any(|e| e.token == "parseManifestConfig"));
+        assert!(config
+            .watchlist_exact
+            .iter()
+            .any(|e| e.token == "${runtime.secretKey}"));
 
         // Verify these tokens are actually caught
         let result = output_guard::scan_output(
@@ -92,14 +108,23 @@ mod system_prompt_registry {
 
         system_prompt_registry::register_system_prompt("Use FIRST_SECRET_TOKEN for auth.");
         let config1 = system_prompt_registry::get_cached_config().unwrap();
-        assert!(config1.watchlist_exact.iter().any(|e| e.token == "FIRST_SECRET_TOKEN"));
+        assert!(config1
+            .watchlist_exact
+            .iter()
+            .any(|e| e.token == "FIRST_SECRET_TOKEN"));
 
         // Re-register with different prompt
         system_prompt_registry::register_system_prompt("Use SECOND_SECRET_TOKEN for auth.");
         let config2 = system_prompt_registry::get_cached_config().unwrap();
-        assert!(config2.watchlist_exact.iter().any(|e| e.token == "SECOND_SECRET_TOKEN"));
+        assert!(config2
+            .watchlist_exact
+            .iter()
+            .any(|e| e.token == "SECOND_SECRET_TOKEN"));
         assert!(
-            !config2.watchlist_exact.iter().any(|e| e.token == "FIRST_SECRET_TOKEN"),
+            !config2
+                .watchlist_exact
+                .iter()
+                .any(|e| e.token == "FIRST_SECRET_TOKEN"),
             "Old token should be gone after re-registration"
         );
 
@@ -122,7 +147,10 @@ mod system_prompt_registry {
 
         system_prompt_registry::register_system_prompt("Different prompt content.");
         let hash3 = system_prompt_registry::prompt_hash().unwrap();
-        assert_ne!(hash1, hash3, "Different prompts should produce different hashes");
+        assert_ne!(
+            hash1, hash3,
+            "Different prompts should produce different hashes"
+        );
 
         system_prompt_registry::clear();
     }
@@ -147,7 +175,10 @@ mod system_prompt_registry {
         // Verify static tokens still present
         let static_token = &static_config.watchlist_exact[0].token;
         assert!(
-            dynamic_config.watchlist_exact.iter().any(|e| &e.token == static_token),
+            dynamic_config
+                .watchlist_exact
+                .iter()
+                .any(|e| &e.token == static_token),
             "Static watchlist tokens should be preserved"
         );
     }
@@ -183,7 +214,12 @@ mod file_read_guard {
                 &path,
                 None,
             );
-            assert_eq!(result.verdict, GuardVerdict::Deny, "Should deny {} for Skill", key);
+            assert_eq!(
+                result.verdict,
+                GuardVerdict::Deny,
+                "Should deny {} for Skill",
+                key
+            );
         }
     }
 
@@ -255,12 +291,8 @@ mod file_read_guard {
             "/home/user/.docker/config.json",
         ];
         for path in &paths {
-            let result = file_read_guard::check_file_read(
-                Principal::Skill,
-                TaintFlags::empty(),
-                path,
-                None,
-            );
+            let result =
+                file_read_guard::check_file_read(Principal::Skill, TaintFlags::empty(), path, None);
             assert_eq!(
                 result.verdict,
                 GuardVerdict::Deny,
@@ -280,13 +312,13 @@ mod file_read_guard {
 
         // AWS credentials
         let findings = file_read_guard::detect_sensitive_content(
-            "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+            "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         );
         assert!(!findings.is_empty(), "Should detect AWS secret key");
 
         // Clean content
         let findings = file_read_guard::detect_sensitive_content(
-            "fn main() {\n    println!(\"Hello world\");\n}\n"
+            "fn main() {\n    println!(\"Hello world\");\n}\n",
         );
         assert!(findings.is_empty(), "Clean code should have no findings");
     }
@@ -368,7 +400,11 @@ mod network_guard {
             100,
             None,
         );
-        assert_eq!(result.verdict, GuardVerdict::Deny, "Blocklist applies to all principals");
+        assert_eq!(
+            result.verdict,
+            GuardVerdict::Deny,
+            "Blocklist applies to all principals"
+        );
     }
 
     #[test]
@@ -471,7 +507,10 @@ mod network_guard {
             None,
         );
         assert!(
-            result.flags.iter().any(|f| f.category == network_guard::NetworkFlagCategory::Base64InUrl),
+            result
+                .flags
+                .iter()
+                .any(|f| f.category == network_guard::NetworkFlagCategory::Base64InUrl),
             "Should flag base64 in URL query parameters"
         );
     }
@@ -486,7 +525,11 @@ mod network_guard {
             100,
             None,
         );
-        assert_eq!(result.verdict, GuardVerdict::Deny, "Subdomains of blocked domains should also be blocked");
+        assert_eq!(
+            result.verdict,
+            GuardVerdict::Deny,
+            "Subdomains of blocked domains should also be blocked"
+        );
     }
 
     #[test]
@@ -505,7 +548,11 @@ mod network_guard {
             0,
             Some(&config),
         );
-        assert_eq!(result.verdict, GuardVerdict::Deny, "Blocklist should take priority");
+        assert_eq!(
+            result.verdict,
+            GuardVerdict::Deny,
+            "Blocklist should take priority"
+        );
     }
 
     #[test]
@@ -537,15 +584,15 @@ mod sandbox_audit {
     fn test_audit_runs_without_panic() {
         let result = sandbox_audit::audit_sandbox_environment();
         // Should work on any platform — findings may vary
-        assert!(!result.findings.is_empty(), "Should have at least one finding");
+        assert!(
+            !result.findings.is_empty(),
+            "Should have at least one finding"
+        );
     }
 
     #[test]
     fn test_full_compliance_computation() {
-        assert_eq!(
-            sandbox_audit::SandboxCompliance::Full.to_string(),
-            "FULL"
-        );
+        assert_eq!(sandbox_audit::SandboxCompliance::Full.to_string(), "FULL");
     }
 
     #[test]
@@ -563,7 +610,10 @@ mod sandbox_audit {
 
         let profile = sandbox_audit::default_profile();
         let violations = sandbox_audit::evaluate_profile(&audit, &profile);
-        assert!(violations.len() >= 2, "Should have at least container + seccomp violations");
+        assert!(
+            violations.len() >= 2,
+            "Should have at least container + seccomp violations"
+        );
     }
 
     #[test]
@@ -584,7 +634,10 @@ mod sandbox_audit {
 
         let profile = sandbox_audit::default_profile();
         let violations = sandbox_audit::evaluate_profile(&audit, &profile);
-        assert!(violations.is_empty(), "Full compliance should have no violations");
+        assert!(
+            violations.is_empty(),
+            "Full compliance should have no violations"
+        );
     }
 
     #[test]
@@ -719,7 +772,10 @@ mod hooks_integration {
             vec![],
         );
         assert!(result.is_ok());
-        assert!(result.unwrap().is_err(), "Should deny exfil service request");
+        assert!(
+            result.unwrap().is_err(),
+            "Should deny exfil service request"
+        );
     }
 
     #[test]

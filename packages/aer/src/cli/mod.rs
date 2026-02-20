@@ -163,7 +163,10 @@ fn init_run() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - MI: deny memory writes from untrusted principals");
     println!("  - All read operations: allowed");
     println!();
-    println!("State directory: {}", crate::config::resolve_state_dir().display());
+    println!(
+        "State directory: {}",
+        crate::config::resolve_state_dir().display()
+    );
 
     Ok(())
 }

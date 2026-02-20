@@ -41,7 +41,13 @@ const TAMPER_AUDIT_LOG: &str = r#"{"idx":0,"ts":"2026-02-15T00:00:00Z","recordId
 "#;
 
 /// Create a test bundle directory from inline data.
-fn create_test_bundle(tmp: &TempDir, name: &str, manifest: &str, records: &str, audit: &str) -> std::path::PathBuf {
+fn create_test_bundle(
+    tmp: &TempDir,
+    name: &str,
+    manifest: &str,
+    records: &str,
+    audit: &str,
+) -> std::path::PathBuf {
     let bundle = tmp.path().join(name);
     fs::create_dir_all(bundle.join("blobs")).unwrap();
     fs::write(bundle.join("manifest.json"), manifest).unwrap();
@@ -145,7 +151,13 @@ fn test_extra_field_in_manifest_fails_schema() {
 #[test]
 fn test_minimal_bundle_passes() {
     let tmp = TempDir::new().unwrap();
-    let bundle = create_test_bundle(&tmp, "v0.1_minimal_bundle", MINIMAL_MANIFEST, MINIMAL_RECORDS, MINIMAL_AUDIT);
+    let bundle = create_test_bundle(
+        &tmp,
+        "v0.1_minimal_bundle",
+        MINIMAL_MANIFEST,
+        MINIMAL_RECORDS,
+        MINIMAL_AUDIT,
+    );
     aegx_cmd()
         .args(["verify", bundle.to_str().unwrap()])
         .assert()
@@ -156,7 +168,13 @@ fn test_minimal_bundle_passes() {
 #[test]
 fn test_tamper_record_bundle_fails() {
     let tmp = TempDir::new().unwrap();
-    let bundle = create_test_bundle(&tmp, "v0.1_tamper_record_bundle", MINIMAL_MANIFEST, TAMPER_RECORD_RECORDS, MINIMAL_AUDIT);
+    let bundle = create_test_bundle(
+        &tmp,
+        "v0.1_tamper_record_bundle",
+        MINIMAL_MANIFEST,
+        TAMPER_RECORD_RECORDS,
+        MINIMAL_AUDIT,
+    );
     aegx_cmd()
         .args(["verify", bundle.to_str().unwrap()])
         .assert()
@@ -167,7 +185,13 @@ fn test_tamper_record_bundle_fails() {
 #[test]
 fn test_tamper_audit_bundle_fails() {
     let tmp = TempDir::new().unwrap();
-    let bundle = create_test_bundle(&tmp, "v0.1_tamper_audit_bundle", MINIMAL_MANIFEST, MINIMAL_RECORDS, TAMPER_AUDIT_LOG);
+    let bundle = create_test_bundle(
+        &tmp,
+        "v0.1_tamper_audit_bundle",
+        MINIMAL_MANIFEST,
+        MINIMAL_RECORDS,
+        TAMPER_AUDIT_LOG,
+    );
     aegx_cmd()
         .args(["verify", bundle.to_str().unwrap()])
         .assert()

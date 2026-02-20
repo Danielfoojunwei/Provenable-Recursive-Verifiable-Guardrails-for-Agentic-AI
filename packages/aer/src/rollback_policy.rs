@@ -236,7 +236,7 @@ pub fn on_guard_denial(
     let recent_snapshot = find_most_recent_snapshot()?;
 
     // Check recommendation threshold
-    if denial_count >= RECOMMENDATION_THRESHOLD && denial_count < AUTO_ROLLBACK_DENIAL_THRESHOLD {
+    if (RECOMMENDATION_THRESHOLD..AUTO_ROLLBACK_DENIAL_THRESHOLD).contains(&denial_count) {
         if let Some(ref snap) = recent_snapshot {
             result.recommended_snapshot_id = Some(snap.snapshot_id.clone());
             result.recommendation_emitted = true;
@@ -667,18 +667,12 @@ mod tests {
     #[test]
     fn test_denial_tracker_basic() {
         reset_tracker();
-        let count = with_tracker(|t| t.record_denial(
-            GuardSurface::ControlPlane,
-            "test-rule",
-            "record-1",
-        ));
+        let count =
+            with_tracker(|t| t.record_denial(GuardSurface::ControlPlane, "test-rule", "record-1"));
         assert_eq!(count, 1);
 
-        let count = with_tracker(|t| t.record_denial(
-            GuardSurface::ControlPlane,
-            "test-rule",
-            "record-2",
-        ));
+        let count =
+            with_tracker(|t| t.record_denial(GuardSurface::ControlPlane, "test-rule", "record-2"));
         assert_eq!(count, 2);
     }
 
@@ -687,11 +681,13 @@ mod tests {
         reset_tracker();
         // Add events — they are fresh so won't be pruned
         for i in 0..5 {
-            with_tracker(|t| t.record_denial(
-                GuardSurface::ControlPlane,
-                "test-rule",
-                &format!("record-{}", i),
-            ));
+            with_tracker(|t| {
+                t.record_denial(
+                    GuardSurface::ControlPlane,
+                    "test-rule",
+                    &format!("record-{}", i),
+                )
+            });
         }
         let count = current_denial_count();
         assert_eq!(count, 5);

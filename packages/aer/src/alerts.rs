@@ -732,7 +732,9 @@ pub fn notify_skill_verdict(
         ),
         "require_approval" => (
             NotificationLevel::Warning,
-            Some("This skill has security findings. Review findings before approving installation."),
+            Some(
+                "This skill has security findings. Review findings before approving installation.",
+            ),
         ),
         _ => (NotificationLevel::Info, None),
     };
@@ -779,8 +781,6 @@ pub fn notify_denial_policy(result: &crate::rollback_policy::DenialPolicyResult)
 
         let action = if result.auto_rollback_triggered {
             Some("Investigate the attack source before resuming operations.")
-        } else if result.recommended_snapshot_id.is_some() {
-            None // Action embedded in the message
         } else {
             None
         };
@@ -859,17 +859,45 @@ mod notification_tests {
         assert_eq!(notification_count(), MAX_NOTIFICATIONS);
         // First notification should be dropped, last should remain
         let all = peek_notifications();
-        assert!(all.last().unwrap().message.contains(&format!("{}", MAX_NOTIFICATIONS + 49)));
+        assert!(all
+            .last()
+            .unwrap()
+            .message
+            .contains(&format!("{}", MAX_NOTIFICATIONS + 49)));
     }
 
     #[test]
     fn test_level_filtering() {
         let _lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_notifications();
-        notify(NotificationLevel::Info, NotificationSource::System, "info", None, None);
-        notify(NotificationLevel::Warning, NotificationSource::System, "warn", None, None);
-        notify(NotificationLevel::Error, NotificationSource::System, "err", None, None);
-        notify(NotificationLevel::Critical, NotificationSource::System, "crit", None, None);
+        notify(
+            NotificationLevel::Info,
+            NotificationSource::System,
+            "info",
+            None,
+            None,
+        );
+        notify(
+            NotificationLevel::Warning,
+            NotificationSource::System,
+            "warn",
+            None,
+            None,
+        );
+        notify(
+            NotificationLevel::Error,
+            NotificationSource::System,
+            "err",
+            None,
+            None,
+        );
+        notify(
+            NotificationLevel::Critical,
+            NotificationSource::System,
+            "crit",
+            None,
+            None,
+        );
 
         let high = notifications_at_level(NotificationLevel::Error);
         assert_eq!(high.len(), 2); // Error + Critical

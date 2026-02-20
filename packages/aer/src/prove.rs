@@ -430,7 +430,10 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
         "  Proxy Misconfigs:        {}\n",
         p.proxy_misconfigs_detected
     ));
-    out.push_str(&format!("  Auto-Rollbacks:          {}\n", p.auto_rollbacks));
+    out.push_str(&format!(
+        "  Auto-Rollbacks:          {}\n",
+        p.auto_rollbacks
+    ));
     out.push_str(&format!(
         "  Rollback Recs:           {}\n",
         p.rollback_recommendations
@@ -439,7 +442,10 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
         "  Contamination Events:    {}\n",
         p.contamination_events
     ));
-    out.push_str(&format!("  Skills Verified:         {}\n", p.skills_verified));
+    out.push_str(&format!(
+        "  Skills Verified:         {}\n",
+        p.skills_verified
+    ));
     out.push_str(&format!(
         "  Protection Rate:         {:.1}%\n",
         p.protection_rate * 100.0
@@ -498,10 +504,22 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
     // Rollback Status
     if let Some(rs) = &response.rollback_status {
         out.push_str("\n── Rollback & Recovery ─────────────────────────────────────────\n\n");
-        out.push_str(&format!("  Auto-Rollbacks:          {}\n", rs.auto_rollbacks_performed));
-        out.push_str(&format!("  Recommendations:         {}\n", rs.rollback_recommendations));
-        out.push_str(&format!("  Contamination Events:    {}\n", rs.contamination_events));
-        out.push_str(&format!("  Active Denial Count:     {}\n", rs.active_denial_count));
+        out.push_str(&format!(
+            "  Auto-Rollbacks:          {}\n",
+            rs.auto_rollbacks_performed
+        ));
+        out.push_str(&format!(
+            "  Recommendations:         {}\n",
+            rs.rollback_recommendations
+        ));
+        out.push_str(&format!(
+            "  Contamination Events:    {}\n",
+            rs.contamination_events
+        ));
+        out.push_str(&format!(
+            "  Active Denial Count:     {}\n",
+            rs.active_denial_count
+        ));
 
         if !rs.agent_messages.is_empty() {
             out.push_str("\n  ACTION REQUIRED:\n");
@@ -546,10 +564,7 @@ pub fn format_prove_response(response: &ProveResponse) -> String {
             };
             out.push_str(&format!(
                 "  {} [{}] {} — {}\n",
-                icon,
-                n.source,
-                n.level,
-                n.message,
+                icon, n.source, n.level, n.message,
             ));
             if let Some(action) = &n.suggested_action {
                 out.push_str(&format!("       Action: {}\n", action));

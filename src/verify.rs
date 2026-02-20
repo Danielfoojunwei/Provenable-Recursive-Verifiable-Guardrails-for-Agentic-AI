@@ -39,12 +39,17 @@ fn load_all_schemas() -> serde_json::Map<String, Value> {
         .unwrap_or_else(|e| panic!("Cannot read schema bundle {}: {}", path.display(), e));
     let value: Value = serde_json::from_str(&content)
         .unwrap_or_else(|e| panic!("Cannot parse schema bundle {}: {}", path.display(), e));
-    value.as_object().expect("aegx-schemas.json must be an object").clone()
+    value
+        .as_object()
+        .expect("aegx-schemas.json must be an object")
+        .clone()
 }
 
 fn get_schema(key: &str) -> &'static Value {
     let schemas = SCHEMAS.get_or_init(load_all_schemas);
-    schemas.get(key).unwrap_or_else(|| panic!("Missing schema key '{}' in aegx-schemas.json", key))
+    schemas
+        .get(key)
+        .unwrap_or_else(|| panic!("Missing schema key '{}' in aegx-schemas.json", key))
 }
 
 pub fn manifest_schema() -> &'static Value {
