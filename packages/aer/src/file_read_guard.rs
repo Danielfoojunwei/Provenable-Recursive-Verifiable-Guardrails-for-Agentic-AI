@@ -130,10 +130,7 @@ pub fn check_file_read(
     let config = config.unwrap_or(&default);
 
     let path = Path::new(file_path);
-    let basename = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let basename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
     let is_untrusted = principal.is_untrusted_for_memory();
 
@@ -218,7 +215,10 @@ pub fn check_file_read(
     FileReadCheckResult {
         verdict: GuardVerdict::Allow,
         output_taint: taint,
-        rationale: format!("File read allowed: '{}' (no sensitive patterns matched)", file_path),
+        rationale: format!(
+            "File read allowed: '{}' (no sensitive patterns matched)",
+            file_path
+        ),
         matched_pattern: None,
     }
 }
@@ -256,10 +256,19 @@ pub fn detect_sensitive_content(content: &str) -> Vec<SensitiveContentFinding> {
 
     // Credential patterns
     let patterns = [
-        ("-----BEGIN RSA PRIVATE KEY-----", "RSA private key detected"),
+        (
+            "-----BEGIN RSA PRIVATE KEY-----",
+            "RSA private key detected",
+        ),
         ("-----BEGIN EC PRIVATE KEY-----", "EC private key detected"),
-        ("-----BEGIN OPENSSH PRIVATE KEY-----", "OpenSSH private key detected"),
-        ("-----BEGIN PGP PRIVATE KEY BLOCK-----", "PGP private key detected"),
+        (
+            "-----BEGIN OPENSSH PRIVATE KEY-----",
+            "OpenSSH private key detected",
+        ),
+        (
+            "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+            "PGP private key detected",
+        ),
         ("AKIA", "AWS access key ID prefix detected"),
     ];
 
@@ -393,25 +402,25 @@ mod tests {
     #[test]
     fn test_detect_private_key_in_content() {
         let findings = detect_sensitive_content(
-            "Here is the file content:\n-----BEGIN RSA PRIVATE KEY-----\nMIIE..."
+            "Here is the file content:\n-----BEGIN RSA PRIVATE KEY-----\nMIIE...",
         );
         assert!(!findings.is_empty());
-        assert!(findings.iter().any(|f| f.description.contains("RSA private key")));
+        assert!(findings
+            .iter()
+            .any(|f| f.description.contains("RSA private key")));
     }
 
     #[test]
     fn test_detect_aws_key_in_content() {
         let findings = detect_sensitive_content(
-            "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+            "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         );
         assert!(!findings.is_empty());
     }
 
     #[test]
     fn test_clean_content_no_findings() {
-        let findings = detect_sensitive_content(
-            "def hello():\n    print('Hello, world!')\n"
-        );
+        let findings = detect_sensitive_content("def hello():\n    print('Hello, world!')\n");
         assert!(findings.is_empty());
     }
 

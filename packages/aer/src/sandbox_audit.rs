@@ -144,12 +144,7 @@ pub fn audit_sandbox_environment() -> SandboxAuditResult {
     let resource_limits = detect_resource_limits(&mut findings);
 
     // Compute compliance level
-    let compliance = compute_compliance(
-        in_container,
-        seccomp_active,
-        &namespaces,
-        readonly_root,
-    );
+    let compliance = compute_compliance(in_container, seccomp_active, &namespaces, readonly_root);
 
     SandboxAuditResult {
         in_container,
@@ -166,10 +161,7 @@ pub fn audit_sandbox_environment() -> SandboxAuditResult {
 /// Evaluate the audit result against a sandbox profile.
 ///
 /// Returns a list of violations (profile requirements that are not met).
-pub fn evaluate_profile(
-    audit: &SandboxAuditResult,
-    profile: &SandboxProfile,
-) -> Vec<String> {
+pub fn evaluate_profile(audit: &SandboxAuditResult, profile: &SandboxProfile) -> Vec<String> {
     let mut violations = Vec::new();
 
     if profile.require_container && !audit.in_container {
@@ -181,9 +173,7 @@ pub fn evaluate_profile(
     if profile.require_readonly_root && !audit.readonly_root {
         violations.push("Read-only root filesystem required but not detected".into());
     }
-    if profile.require_network_namespace
-        && !audit.namespaces.iter().any(|n| n == "net")
-    {
+    if profile.require_network_namespace && !audit.namespaces.iter().any(|n| n == "net") {
         violations.push("Network namespace isolation required but not detected".into());
     }
 
@@ -318,10 +308,7 @@ fn detect_namespaces(findings: &mut Vec<SandboxFinding>) -> Vec<String> {
             findings.push(SandboxFinding {
                 check: "namespaces".into(),
                 passed: true,
-                detail: format!(
-                    "Namespace isolation detected: {}",
-                    namespaces.join(", ")
-                ),
+                detail: format!("Namespace isolation detected: {}", namespaces.join(", ")),
             });
         }
     } else {
@@ -521,11 +508,15 @@ mod tests {
     #[test]
     fn test_extract_limit_value() {
         assert_eq!(
-            extract_limit_value("Max processes             12345               12345               processes"),
+            extract_limit_value(
+                "Max processes             12345               12345               processes"
+            ),
             Some("12345".into())
         );
         assert_eq!(
-            extract_limit_value("Max open files            unlimited            unlimited            files"),
+            extract_limit_value(
+                "Max open files            unlimited            unlimited            files"
+            ),
             Some("unlimited".into())
         );
     }

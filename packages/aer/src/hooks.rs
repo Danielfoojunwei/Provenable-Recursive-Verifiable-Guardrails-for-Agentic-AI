@@ -387,7 +387,9 @@ pub fn check_proxy_trust(
         audit_chain::emit_audit(&record.record_id)?;
 
         // Emit proxy misconfiguration alert and notify agent
-        if let Ok(_alert) = notif::emit_proxy_alert(trusted_proxies, gateway_addr, &record.record_id) {
+        if let Ok(_alert) =
+            notif::emit_proxy_alert(trusted_proxies, gateway_addr, &record.record_id)
+        {
             notif::notify_proxy_misconfig(trusted_proxies, gateway_addr);
         }
 
@@ -412,11 +414,8 @@ pub fn on_skill_install(
     popular_skills: &[&str],
     parent_records: Vec<String>,
 ) -> io::Result<Result<TypedRecord, TypedRecord>> {
-    let result = crate::skill_verifier::verify_skill_package(
-        package,
-        existing_skills,
-        popular_skills,
-    );
+    let result =
+        crate::skill_verifier::verify_skill_package(package, existing_skills, popular_skills);
 
     let verdict_str = match result.verdict {
         crate::skill_verifier::SkillVerdict::Allow => "allow",
@@ -424,15 +423,19 @@ pub fn on_skill_install(
         crate::skill_verifier::SkillVerdict::Deny => "deny",
     };
 
-    let findings_json: Vec<serde_json::Value> = result.findings.iter().map(|f| {
-        json!({
-            "attack_vector": f.attack_vector,
-            "severity": format!("{:?}", f.severity),
-            "description": f.description,
-            "file": f.file,
-            "evidence": f.evidence,
+    let findings_json: Vec<serde_json::Value> = result
+        .findings
+        .iter()
+        .map(|f| {
+            json!({
+                "attack_vector": f.attack_vector,
+                "severity": format!("{:?}", f.severity),
+                "description": f.description,
+                "file": f.file,
+                "evidence": f.evidence,
+            })
         })
-    }).collect();
+        .collect();
 
     let mut meta = RecordMeta::now();
     meta.config_key = Some("skills.install".to_string());
@@ -483,9 +486,12 @@ pub fn on_skill_install(
                 "Skill '{}' blocked: {} findings (max severity: {:?})",
                 package.name,
                 result.findings.len(),
-                result.findings.iter().map(|f| f.severity).max().unwrap_or(
-                    crate::skill_verifier::SkillFindingSeverity::Info
-                ),
+                result
+                    .findings
+                    .iter()
+                    .map(|f| f.severity)
+                    .max()
+                    .unwrap_or(crate::skill_verifier::SkillFindingSeverity::Info),
             ),
             surface: GuardSurface::ControlPlane,
             principal,
@@ -652,7 +658,8 @@ pub fn on_message_output(
         notif::notify_output_blocked(leaked_count, structural_count, &decision_record.record_id);
 
         // RVU: Compute contamination scope for leakage source
-        if let Ok(scope) = rollback_policy::compute_contamination_scope(&decision_record.record_id) {
+        if let Ok(scope) = rollback_policy::compute_contamination_scope(&decision_record.record_id)
+        {
             if scope.contaminated_count > 0 {
                 notif::notify(
                     notif::NotificationLevel::Critical,
@@ -667,7 +674,9 @@ pub fn on_message_output(
                     Some("Review contaminated records and consider rollback."),
                 );
             }
-            if let Err(e) = rollback_policy::emit_contamination_alert(&decision_record.record_id, &scope) {
+            if let Err(e) =
+                rollback_policy::emit_contamination_alert(&decision_record.record_id, &scope)
+            {
                 notif::notify(
                     notif::NotificationLevel::Warning,
                     notif::NotificationSource::System,
@@ -723,8 +732,7 @@ pub fn on_system_prompt_available(
     system_prompt: &str,
 ) -> io::Result<TypedRecord> {
     let token_count = crate::output_guard::register_system_prompt(system_prompt);
-    let prompt_hash = crate::output_guard::prompt_hash()
-        .unwrap_or_else(|| "unknown".to_string());
+    let prompt_hash = crate::output_guard::prompt_hash().unwrap_or_else(|| "unknown".to_string());
 
     let mut meta = RecordMeta::now();
     meta.agent_id = Some(agent_id.to_string());
@@ -856,6 +864,7 @@ pub fn on_file_read(
 /// restrict untrusted principals. Oversized payloads are flagged.
 ///
 /// Returns Ok(Ok(record)) if allowed, Ok(Err(record)) if denied.
+#[allow(clippy::too_many_arguments)]
 pub fn on_outbound_request(
     agent_id: &str,
     session_id: &str,
@@ -867,7 +876,12 @@ pub fn on_outbound_request(
     parent_records: Vec<String>,
 ) -> io::Result<Result<TypedRecord, TypedRecord>> {
     let check = crate::network_guard::check_outbound_request(
-        principal, taint, url, method, payload_size, None,
+        principal,
+        taint,
+        url,
+        method,
+        payload_size,
+        None,
     );
 
     let mut meta = RecordMeta::now();
@@ -877,10 +891,12 @@ pub fn on_outbound_request(
     let flags_json: Vec<serde_json::Value> = check
         .flags
         .iter()
-        .map(|f| json!({
-            "category": format!("{:?}", f.category),
-            "description": &f.description,
-        }))
+        .map(|f| {
+            json!({
+                "category": format!("{:?}", f.category),
+                "description": &f.description,
+            })
+        })
         .collect();
 
     match check.verdict {

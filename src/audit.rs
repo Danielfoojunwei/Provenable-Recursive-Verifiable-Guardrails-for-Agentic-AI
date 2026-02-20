@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufRead, Write};
 use std::path::Path;
 
-use crate::canonical::canonical_json;
-use crate::hash::sha256_hex;
+use crate::canonical::{canonical_json, sha256_hex};
 
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 

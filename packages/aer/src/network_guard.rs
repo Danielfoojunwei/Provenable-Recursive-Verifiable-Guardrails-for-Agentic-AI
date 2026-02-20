@@ -156,9 +156,9 @@ pub fn check_outbound_request(
 
     // 2. Check allowlist (if configured)
     if !config.allowed_domains.is_empty() {
-        let allowed = domain.as_ref().map_or(false, |d| {
-            config.allowed_domains.iter().any(|a| domain_matches(d, a))
-        });
+        let allowed = domain
+            .as_ref()
+            .is_some_and(|d| config.allowed_domains.iter().any(|a| domain_matches(d, a)));
         if !allowed {
             let d = domain.as_deref().unwrap_or("unknown");
             flags.push(NetworkFlag {
@@ -297,9 +297,7 @@ fn is_exfiltration_service(domain: &str) -> bool {
         "loca.lt",
         "serveo.net",
     ];
-    services
-        .iter()
-        .any(|s| domain_matches(domain, s))
+    services.iter().any(|s| domain_matches(domain, s))
 }
 
 #[cfg(test)]
@@ -330,7 +328,10 @@ mod tests {
             None,
         );
         assert_eq!(result.verdict, GuardVerdict::Deny);
-        assert!(result.flags.iter().any(|f| f.category == NetworkFlagCategory::BlockedDomain));
+        assert!(result
+            .flags
+            .iter()
+            .any(|f| f.category == NetworkFlagCategory::BlockedDomain));
     }
 
     #[test]
@@ -395,7 +396,10 @@ mod tests {
             Some(&config),
         );
         assert_eq!(result.verdict, GuardVerdict::Deny);
-        assert!(result.flags.iter().any(|f| f.category == NetworkFlagCategory::OversizedPayload));
+        assert!(result
+            .flags
+            .iter()
+            .any(|f| f.category == NetworkFlagCategory::OversizedPayload));
     }
 
     #[test]
@@ -415,7 +419,10 @@ mod tests {
             Some(&config),
         );
         assert_eq!(result.verdict, GuardVerdict::Allow);
-        assert!(result.flags.iter().any(|f| f.category == NetworkFlagCategory::OversizedPayload));
+        assert!(result
+            .flags
+            .iter()
+            .any(|f| f.category == NetworkFlagCategory::OversizedPayload));
     }
 
     #[test]
@@ -428,7 +435,10 @@ mod tests {
             0,
             None,
         );
-        assert!(result.flags.iter().any(|f| f.category == NetworkFlagCategory::Base64InUrl));
+        assert!(result
+            .flags
+            .iter()
+            .any(|f| f.category == NetworkFlagCategory::Base64InUrl));
     }
 
     #[test]
@@ -440,9 +450,18 @@ mod tests {
 
     #[test]
     fn test_extract_domain() {
-        assert_eq!(extract_domain("https://api.github.com/repos"), Some("api.github.com".into()));
-        assert_eq!(extract_domain("http://localhost:8080/api"), Some("localhost".into()));
-        assert_eq!(extract_domain("https://example.com"), Some("example.com".into()));
+        assert_eq!(
+            extract_domain("https://api.github.com/repos"),
+            Some("api.github.com".into())
+        );
+        assert_eq!(
+            extract_domain("http://localhost:8080/api"),
+            Some("localhost".into())
+        );
+        assert_eq!(
+            extract_domain("https://example.com"),
+            Some("example.com".into())
+        );
     }
 
     #[test]

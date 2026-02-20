@@ -1,11 +1,96 @@
+use jsonschema::Validator;
+use serde_json::Value;
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use crate::audit;
 use crate::bundle;
-use crate::hash::sha256_hex;
+use crate::canonical::sha256_hex;
 use crate::records::{self, Payload};
-use crate::schema;
+
+// ---- Schema validation (merged from schema.rs) ----
+
+static SCHEMAS: OnceLock<serde_json::Map<String, Value>> = OnceLock::new();
+
+fn find_schemas_file() -> std::path::PathBuf {
+    // Look for the consolidated aegx-schemas.json
+    if let Ok(exe) = std::env::current_exe() {
+        let exe_dir = exe.parent().unwrap_or(Path::new("."));
+        for relative in &["../schemas", "../../schemas"] {
+            let candidate = exe_dir.join(relative).join("aegx-schemas.json");
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+    }
+    if let Ok(dir) = std::env::var("CARGO_MANIFEST_DIR") {
+        let candidate = Path::new(&dir).join("schemas/aegx-schemas.json");
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    Path::new("schemas/aegx-schemas.json").to_path_buf()
+}
+
+fn load_all_schemas() -> serde_json::Map<String, Value> {
+    let path = find_schemas_file();
+    let content = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("Cannot read schema bundle {}: {}", path.display(), e));
+    let value: Value = serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("Cannot parse schema bundle {}: {}", path.display(), e));
+    value
+        .as_object()
+        .expect("aegx-schemas.json must be an object")
+        .clone()
+}
+
+fn get_schema(key: &str) -> &'static Value {
+    let schemas = SCHEMAS.get_or_init(load_all_schemas);
+    schemas
+        .get(key)
+        .unwrap_or_else(|| panic!("Missing schema key '{}' in aegx-schemas.json", key))
+}
+
+pub fn manifest_schema() -> &'static Value {
+    get_schema("manifest")
+}
+
+pub fn record_schema() -> &'static Value {
+    get_schema("record")
+}
+
+pub fn audit_entry_schema() -> &'static Value {
+    get_schema("audit-entry")
+}
+
+pub fn validate_manifest(value: &Value) -> Result<(), Vec<String>> {
+    validate_against(value, manifest_schema())
+}
+
+pub fn validate_record(value: &Value) -> Result<(), Vec<String>> {
+    validate_against(value, record_schema())
+}
+
+pub fn validate_audit_entry(value: &Value) -> Result<(), Vec<String>> {
+    validate_against(value, audit_entry_schema())
+}
+
+fn validate_against(value: &Value, schema: &Value) -> Result<(), Vec<String>> {
+    let validator = Validator::new(schema).expect("schema compilation failed");
+    let result = validator.validate(value);
+    if result.is_ok() {
+        Ok(())
+    } else {
+        let errors: Vec<String> = validator
+            .iter_errors(value)
+            .map(|e| format!("{} at {}", e, e.instance_path))
+            .collect();
+        Err(errors)
+    }
+}
+
+// ---- Verification ----
 
 /// Exit codes for verification.
 pub const EXIT_SUCCESS: i32 = 0;
@@ -49,7 +134,7 @@ pub fn verify_bundle(bundle_dir: &Path) -> VerifyResult {
         }
     };
 
-    if let Err(errs) = schema::validate_manifest(&manifest) {
+    if let Err(errs) = validate_manifest(&manifest) {
         for e in &errs {
             errors.push(format!("manifest.json: schema: {}", e));
         }
@@ -71,7 +156,7 @@ pub fn verify_bundle(bundle_dir: &Path) -> VerifyResult {
     // Validate each record schema
     for (i, record) in records.iter().enumerate() {
         let val = serde_json::to_value(record).unwrap();
-        if let Err(errs) = schema::validate_record(&val) {
+        if let Err(errs) = validate_record(&val) {
             for e in &errs {
                 errors.push(format!("records.jsonl line {}: schema: {}", i + 1, e));
             }
@@ -93,7 +178,7 @@ pub fn verify_bundle(bundle_dir: &Path) -> VerifyResult {
 
     for (i, entry) in audit_entries.iter().enumerate() {
         let val = serde_json::to_value(entry).unwrap();
-        if let Err(errs) = schema::validate_audit_entry(&val) {
+        if let Err(errs) = validate_audit_entry(&val) {
             for e in &errs {
                 errors.push(format!("audit-log.jsonl line {}: schema: {}", i + 1, e));
             }

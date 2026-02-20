@@ -1,5 +1,25 @@
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use unicode_normalization::UnicodeNormalization;
+
+// ---- Hashing utilities (merged from hash.rs) ----
+
+/// Compute SHA-256 hash of bytes, returning raw 32-byte array.
+pub fn sha256_bytes(data: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let result = hasher.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&result);
+    out
+}
+
+/// Compute SHA-256 hash of bytes, returning lowercase hex string.
+pub fn sha256_hex(data: &[u8]) -> String {
+    hex::encode(sha256_bytes(data))
+}
+
+// ---- Canonicalization ----
 
 /// Normalize a timestamp to RFC3339 "Z" form with second precision.
 /// Accepts formats like "2026-02-15T00:00:00Z", "2026-02-15T00:00:00+00:00", etc.

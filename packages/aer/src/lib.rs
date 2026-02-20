@@ -21,3 +21,22 @@ pub mod snapshot;
 pub mod types;
 pub mod verify;
 pub mod workspace;
+
+// Re-exports for modules consolidated during file reduction.
+// rollback functions merged into rollback_policy.
+pub mod rollback {
+    pub use crate::rollback_policy::*;
+}
+
+// metrics functions merged into prove.
+pub mod metrics {
+    pub use crate::prove::{get_metrics, record_evaluation, reset_metrics, GuardMetrics};
+}
+
+// system_prompt_registry functions merged into output_guard.
+pub mod system_prompt_registry {
+    pub use crate::output_guard::{
+        clear_registry as clear, dynamic_token_count, get_cached_config, prompt_hash,
+        register_system_prompt, register_tokens_only,
+    };
+}

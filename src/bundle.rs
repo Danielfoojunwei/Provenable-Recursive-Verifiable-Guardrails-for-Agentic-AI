@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use crate::hash::sha256_hex;
+use crate::canonical::sha256_hex;
 
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 

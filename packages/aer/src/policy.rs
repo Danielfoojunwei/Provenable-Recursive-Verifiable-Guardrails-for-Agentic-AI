@@ -209,9 +209,8 @@ pub fn default_policy() -> PolicyPack {
                     taint_any: Some(TaintFlags::UNTRUSTED),
                     require_approval: None,
                 },
-                description:
-                    "Deny conversation messages from untrusted principals with taint"
-                        .to_string(),
+                description: "Deny conversation messages from untrusted principals with taint"
+                    .to_string(),
             },
             // CIO: allow clean messages
             PolicyRule {
