@@ -29,7 +29,7 @@ pub fn verify_bundle(bundle_dir: &Path) -> io::Result<VerificationResult> {
             match serde_json::from_str::<TypedRecord>(&line) {
                 Ok(record) => {
                     // Recompute record ID using 6-field hash
-                    let rt_val = match serde_json::to_value(&record.record_type) {
+                    let rt_val = match serde_json::to_value(record.record_type) {
                         Ok(v) => v,
                         Err(e) => {
                             errors.push(VerificationError {
@@ -39,8 +39,8 @@ pub fn verify_bundle(bundle_dir: &Path) -> io::Result<VerificationResult> {
                             continue;
                         }
                     };
-                    let p_val = serde_json::to_value(&record.principal).unwrap();
-                    let t_val = serde_json::to_value(&record.taint).unwrap();
+                    let p_val = serde_json::to_value(record.principal).unwrap();
+                    let t_val = serde_json::to_value(record.taint).unwrap();
                     let parents_val = serde_json::to_value(&record.parents).unwrap();
                     let meta_val = match serde_json::to_value(&record.meta) {
                         Ok(v) => v,

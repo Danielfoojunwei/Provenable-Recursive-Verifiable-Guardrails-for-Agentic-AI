@@ -176,7 +176,7 @@ pub fn export_dir_to_zip(bundle_dir: &Path, zip_path: &Path) -> io::Result<()> {
         let path = entry.path();
         let relative = path
             .strip_prefix(bundle_dir)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| io::Error::other(e.to_string()))?;
 
         if relative.as_os_str().is_empty() {
             continue;
@@ -365,7 +365,7 @@ pub fn import_zip(zip_path: &Path, out_dir: &Path) -> io::Result<()> {
         let path = entry.path();
         let relative = path
             .strip_prefix(tmp.path())
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| io::Error::other(e.to_string()))?;
 
         if relative.as_os_str().is_empty() {
             continue;

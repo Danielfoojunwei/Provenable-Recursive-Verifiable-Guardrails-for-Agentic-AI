@@ -289,10 +289,7 @@ mod tests {
     fn test_normalize_meta() {
         let meta = json!({"ts": "2026-02-15T00:00:00+00:00", "agent_id": "a1"});
         let normalized = normalize_meta(&meta);
-        assert_eq!(
-            normalized["ts"].as_str().unwrap(),
-            "2026-02-15T00:00:00Z"
-        );
+        assert_eq!(normalized["ts"].as_str().unwrap(), "2026-02-15T00:00:00Z");
         assert_eq!(normalized["agent_id"].as_str().unwrap(), "a1");
     }
 }

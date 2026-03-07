@@ -39,13 +39,20 @@ pub fn create_record(
     };
 
     // Compute record ID using aegx's authoritative 6-field hash
-    let rt_val = serde_json::to_value(&record_type)?;
-    let p_val = serde_json::to_value(&principal)?;
-    let t_val = serde_json::to_value(&taint)?;
+    let rt_val = serde_json::to_value(record_type)?;
+    let p_val = serde_json::to_value(principal)?;
+    let t_val = serde_json::to_value(taint)?;
     let parents_val = serde_json::to_value(&parents)?;
     let meta_val = serde_json::to_value(&meta)?;
     let payload_val = serde_json::to_value(&payload)?;
-    let record_id = compute_record_id(&rt_val, &p_val, &t_val, &parents_val, &meta_val, &payload_val);
+    let record_id = compute_record_id(
+        &rt_val,
+        &p_val,
+        &t_val,
+        &parents_val,
+        &meta_val,
+        &payload_val,
+    );
 
     Ok(TypedRecord {
         record_id,
@@ -139,15 +146,15 @@ pub fn resolve_payload(record: &TypedRecord) -> io::Result<serde_json::Value> {
 
 /// Verify that a record's ID matches its content.
 pub fn verify_record_hash(record: &TypedRecord) -> bool {
-    let rt_val = match serde_json::to_value(&record.record_type) {
+    let rt_val = match serde_json::to_value(record.record_type) {
         Ok(v) => v,
         Err(_) => return false,
     };
-    let p_val = match serde_json::to_value(&record.principal) {
+    let p_val = match serde_json::to_value(record.principal) {
         Ok(v) => v,
         Err(_) => return false,
     };
-    let t_val = match serde_json::to_value(&record.taint) {
+    let t_val = match serde_json::to_value(record.taint) {
         Ok(v) => v,
         Err(_) => return false,
     };
@@ -163,7 +170,14 @@ pub fn verify_record_hash(record: &TypedRecord) -> bool {
         Ok(v) => v,
         Err(_) => return false,
     };
-    let expected = compute_record_id(&rt_val, &p_val, &t_val, &parents_val, &meta_val, &payload_val);
+    let expected = compute_record_id(
+        &rt_val,
+        &p_val,
+        &t_val,
+        &parents_val,
+        &meta_val,
+        &payload_val,
+    );
     expected == record.record_id
 }
 

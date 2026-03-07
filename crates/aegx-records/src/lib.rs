@@ -13,6 +13,8 @@ pub mod audit_chain;
 pub mod config;
 pub mod records;
 
-pub use audit_chain::{ChainError, verify_entries};
+pub use audit_chain::{verify_entries, ChainError};
 pub use config::{ensure_aer_dirs, resolve_state_dir, MEMORY_FILES};
-pub use records::{append_record, create_record, emit_record, read_all_records, read_filtered_records};
+pub use records::{
+    append_record, create_record, emit_record, read_all_records, read_filtered_records,
+};

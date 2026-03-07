@@ -37,7 +37,6 @@
 //! ```
 
 use crate::scanner;
-use aegx_types::*;
 use regex::Regex;
 use std::sync::LazyLock;
 

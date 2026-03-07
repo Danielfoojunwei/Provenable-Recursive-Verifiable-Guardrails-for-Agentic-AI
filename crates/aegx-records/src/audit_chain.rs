@@ -14,8 +14,7 @@ use std::io::{self, BufRead, Write};
 use crate::config;
 
 /// Genesis hash for the first entry in the chain.
-pub const GENESIS_HASH: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+pub const GENESIS_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 /// Append a new entry to the audit chain for a given record ID.
 pub fn append_audit_entry(record_id: &str) -> io::Result<AuditEntry> {
@@ -141,7 +140,10 @@ pub fn verify_entries(entries: &[AuditEntry]) -> Result<u64, ChainError> {
 /// Chain verification errors.
 #[derive(Debug, Clone)]
 pub enum ChainError {
-    IndexGap { expected: u64, found: u64 },
+    IndexGap {
+        expected: u64,
+        found: u64,
+    },
     PrevHashMismatch {
         idx: u64,
         expected: String,

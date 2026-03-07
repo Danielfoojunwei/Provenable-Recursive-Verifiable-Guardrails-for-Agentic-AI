@@ -4,19 +4,21 @@
 //! what Provenable.ai has protected, with structured responses showing
 //! threat alerts, guard performance, and system health.
 
+use aegx_bundle::verify;
 use aegx_guard::alerts::{self, AlertSeverity, ThreatAlert, ThreatCategory};
 use aegx_records::audit_chain;
 use aegx_records::records;
 use aegx_types::*;
-use aegx_bundle::verify;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-pub use aegx_guard::metrics::{EvalTimer, GuardMetrics, get_metrics, record_evaluation, reset_metrics};
+pub use aegx_guard::metrics::{
+    get_metrics, record_evaluation, reset_metrics, EvalTimer, GuardMetrics,
+};
 
 /// Query parameters for the `/prove` command.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -352,7 +354,9 @@ fn compute_health() -> io::Result<SystemHealth> {
         record_count,
         audit_entries: entries.len() as u64,
         alert_count,
-        state_dir: aegx_records::config::resolve_state_dir().display().to_string(),
+        state_dir: aegx_records::config::resolve_state_dir()
+            .display()
+            .to_string(),
         warnings,
     })
 }
@@ -614,7 +618,11 @@ pub fn get_recent_evaluations(limit: usize) -> Vec<GuardEvaluation> {
 static RECENT_EVALS: Mutex<Vec<GuardEvaluation>> = Mutex::new(Vec::new());
 
 /// Record a detailed guard evaluation (for local recent-evaluations tracking).
-pub fn record_detailed_evaluation(surface: GuardSurface, verdict: GuardVerdict, duration: Duration) {
+pub fn record_detailed_evaluation(
+    surface: GuardSurface,
+    verdict: GuardVerdict,
+    duration: Duration,
+) {
     let duration_us = duration.as_micros() as u64;
     let eval = GuardEvaluation {
         timestamp: Utc::now(),

@@ -80,7 +80,7 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
 }
 
 fn compute_summary(store: &MetricsStore) -> GuardMetrics {
-    let mut all: Vec<f64> = store
+    let all: Vec<f64> = store
         .control_plane_evals
         .iter()
         .chain(&store.memory_evals)
@@ -88,10 +88,7 @@ fn compute_summary(store: &MetricsStore) -> GuardMetrics {
         .copied()
         .collect();
 
-    let uptime_secs = store
-        .start_time
-        .map(|s| s.elapsed().as_secs())
-        .unwrap_or(0);
+    let uptime_secs = store.start_time.map(|s| s.elapsed().as_secs()).unwrap_or(0);
 
     let total = all.len();
     let evals_per_sec = if uptime_secs > 0 {

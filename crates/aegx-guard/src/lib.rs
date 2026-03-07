@@ -25,10 +25,9 @@ pub mod scanner;
 pub mod skill_verifier;
 
 pub use guard::{
-    gate_control_plane_change, gate_memory_write, Guard,
-    correlated_taint_for_principal, correlated_taint_for_session,
-    cross_surface_denial_count, reset_correlation_state,
-    signal_cpi_denial, signal_injection_detected,
+    correlated_taint_for_principal, correlated_taint_for_session, cross_surface_denial_count,
+    gate_control_plane_change, gate_memory_write, reset_correlation_state, signal_cpi_denial,
+    signal_injection_detected, Guard,
 };
 pub use metrics::{get_metrics, record_evaluation, reset_metrics, EvalTimer, GuardMetrics};
 pub use policy::{default_policy, evaluate, load_policy, save_policy};

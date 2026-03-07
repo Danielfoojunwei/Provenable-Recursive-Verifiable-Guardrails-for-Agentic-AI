@@ -63,8 +63,7 @@ pub fn generate_markdown_report(records: &[TypedRecord], audit_entries: &[AuditE
                             .get("rule_id")
                             .and_then(|s| s.as_str())
                             .unwrap_or("unknown");
-                        let rationale =
-                            gd.get("rationale").and_then(|s| s.as_str()).unwrap_or("");
+                        let rationale = gd.get("rationale").and_then(|s| s.as_str()).unwrap_or("");
                         md.push_str(&format!(
                             "- **{}** (rule: `{}`): {}\n",
                             surface, rule, rationale

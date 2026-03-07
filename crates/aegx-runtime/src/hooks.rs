@@ -1,10 +1,10 @@
-use aegx_guard::alerts::{self as notif};
-use aegx_records::audit_chain;
-use aegx_types::sha256_hex;
-use aegx_records::config;
-use aegx_guard::guard;
-use aegx_records::records;
 use crate::rollback_policy;
+use aegx_guard::alerts::{self as notif};
+use aegx_guard::guard;
+use aegx_records::audit_chain;
+use aegx_records::config;
+use aegx_records::records;
+use aegx_types::sha256_hex;
 use aegx_types::*;
 use serde_json::json;
 use std::io;
@@ -328,10 +328,10 @@ pub fn on_file_write(
                     &detail,
                 ) {
                     notif::notify_denial_policy(&notif::DenialPolicyNotification {
-                    auto_rollback_triggered: policy_result.auto_rollback_triggered,
-                    recommendation_emitted: policy_result.recommendation_emitted,
-                    agent_message: policy_result.agent_message.clone(),
-                });
+                        auto_rollback_triggered: policy_result.auto_rollback_triggered,
+                        recommendation_emitted: policy_result.recommendation_emitted,
+                        agent_message: policy_result.agent_message.clone(),
+                    });
                 }
 
                 Ok(Err(decision_record))
@@ -719,10 +719,10 @@ pub fn on_message_output(
             &detail,
         ) {
             notif::notify_denial_policy(&notif::DenialPolicyNotification {
-                    auto_rollback_triggered: policy_result.auto_rollback_triggered,
-                    recommendation_emitted: policy_result.recommendation_emitted,
-                    agent_message: policy_result.agent_message.clone(),
-                });
+                auto_rollback_triggered: policy_result.auto_rollback_triggered,
+                recommendation_emitted: policy_result.recommendation_emitted,
+                agent_message: policy_result.agent_message.clone(),
+            });
         }
 
         Ok(Err(decision_record))
@@ -748,7 +748,8 @@ pub fn on_system_prompt_available(
     system_prompt: &str,
 ) -> io::Result<TypedRecord> {
     let token_count = aegx_guard::output_guard::register_system_prompt(system_prompt);
-    let prompt_hash = aegx_guard::output_guard::prompt_hash().unwrap_or_else(|| "unknown".to_string());
+    let prompt_hash =
+        aegx_guard::output_guard::prompt_hash().unwrap_or_else(|| "unknown".to_string());
 
     let mut meta = RecordMeta::now();
     meta.agent_id = Some(agent_id.to_string());

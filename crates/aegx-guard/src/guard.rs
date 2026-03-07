@@ -553,7 +553,9 @@ pub fn signal_cpi_denial(principal: Principal) {
     let mut lock = CORRELATED_TAINT.lock().unwrap_or_else(|e| e.into_inner());
     let state = lock.get_or_insert_with(CorrelationState::new);
     state.expire();
-    state.cpi_denied_principals.push((principal, Instant::now()));
+    state
+        .cpi_denied_principals
+        .push((principal, Instant::now()));
     state.cross_surface_denials += 1;
 }
 
@@ -562,7 +564,9 @@ pub fn signal_injection_detected(session_id: &str) {
     let mut lock = CORRELATED_TAINT.lock().unwrap_or_else(|e| e.into_inner());
     let state = lock.get_or_insert_with(CorrelationState::new);
     state.expire();
-    state.injection_sessions.push((session_id.to_string(), Instant::now()));
+    state
+        .injection_sessions
+        .push((session_id.to_string(), Instant::now()));
     state.cross_surface_denials += 1;
 }
 
@@ -572,7 +576,11 @@ pub fn correlated_taint_for_principal(principal: Principal) -> TaintFlags {
     let lock = CORRELATED_TAINT.lock().unwrap_or_else(|e| e.into_inner());
     match &*lock {
         Some(state) => {
-            if state.cpi_denied_principals.iter().any(|(p, _)| *p == principal) {
+            if state
+                .cpi_denied_principals
+                .iter()
+                .any(|(p, _)| *p == principal)
+            {
                 // Principal was denied CPI access → taint their MI writes
                 TaintFlags::UNTRUSTED
             } else {
@@ -588,7 +596,11 @@ pub fn correlated_taint_for_session(session_id: &str) -> TaintFlags {
     let lock = CORRELATED_TAINT.lock().unwrap_or_else(|e| e.into_inner());
     match &*lock {
         Some(state) => {
-            if state.injection_sessions.iter().any(|(s, _)| s == session_id) {
+            if state
+                .injection_sessions
+                .iter()
+                .any(|(s, _)| s == session_id)
+            {
                 TaintFlags::INJECTION_SUSPECT | TaintFlags::UNTRUSTED
             } else {
                 TaintFlags::empty()

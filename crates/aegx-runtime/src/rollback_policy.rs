@@ -24,11 +24,11 @@
 //! closure property: given a contamination source, all downstream records
 //! that depend on it are identified for review or rollback.
 
+use crate::snapshot;
 use aegx_guard::alerts::{self, AlertSeverity, ThreatCategory};
 use aegx_records::audit_chain;
 use aegx_records::config;
 use aegx_records::records;
-use crate::snapshot;
 use aegx_types::*;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
