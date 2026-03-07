@@ -1,11 +1,6 @@
 /target
-/packages/aer/target
 /installer/tools/target
 *.swp
 *.swo
 .DS_Store
 *.proptest-regressions
-
-# Skill bins are symlinks created by setup.sh — not tracked
-skills/provenable/bins/aegx
-skills/provenable/bins/proven-aer

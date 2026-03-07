@@ -49,15 +49,3 @@ jobs:
 
       - name: Clippy (aegx)
         run: cargo clippy --locked -- -D warnings
-
-      - name: Build (aer)
-        run: cargo build --manifest-path packages/aer/Cargo.toml --locked
-
-      - name: Test (aer)
-        run: cargo test --manifest-path packages/aer/Cargo.toml --locked -- --test-threads=1
-
-      - name: Format check (aer)
-        run: cargo fmt --manifest-path packages/aer/Cargo.toml --check
-
-      - name: Clippy (aer)
-        run: cargo clippy --manifest-path packages/aer/Cargo.toml --locked -- -D warnings

@@ -149,8 +149,8 @@ The previous codebase consisted of three separate systems:
 | Previous | New | What Changed |
 |----------|-----|--------------|
 | `src/` (aegx crate) — bundle format, canonical hashing, verification | `aegx-types` + `aegx-records` + `aegx-bundle` | Decomposed into layered crates; canonical JSON with NFC normalization and 6-field record IDs are the authoritative implementation |
-| `packages/aer/src/` — runtime guards, scanner, rollback, hooks | `aegx-guard` + `aegx-runtime` | Extracted into two crates; guard logic (policy, scanner, alerts) separated from runtime orchestration (hooks, snapshots, rollback) |
-| Two separate CLIs (`aegx` + `proven-aer`) | Single `aegx` CLI | Unified entry point with all commands |
+| AER runtime guards, scanner, rollback, hooks | `aegx-guard` + `aegx-runtime` | Extracted into two crates; guard logic (policy, scanner, alerts) separated from runtime orchestration (hooks, snapshots, rollback) |
+| Two separate CLIs | Single `aegx` CLI | Unified entry point with all commands |
 | No cross-surface awareness | **Cross-surface threat correlation** | CPI denial → MI taint escalation; injection → session-wide taint; cross-surface denial counts feed RVU escalation |
 | Workspace writes bypassed hooks | **All writes route through hooks** | `workspace.rs` calls `hooks::on_file_write()` for full guard → record → audit → rollback pipeline |
 
@@ -364,7 +364,7 @@ theorem. The table below shows the exact mapping:
 
 We ran the exact ZeroLeaks attack taxonomy — 36 real attack payloads — against
 our ConversationIO guard using the actual scanner and output guard code.
-**No mocks, no simulations, no cherry-picking** (`packages/aer/tests/zeroleaks_benchmark.rs`).
+**No mocks, no simulations, no cherry-picking.**
 
 ### Results (Worst-Case: USER Principal, Input Scanner Only)
 
@@ -611,7 +611,6 @@ crates/
     main.rs             # CLI entry point
     cli.rs              # Command definitions and handlers
 docs/                   # Documentation
-packages/aer/           # Legacy AER source (preserved for reference)
 ```
 
 ## Documentation
@@ -630,7 +629,6 @@ packages/aer/           # Legacy AER source (preserved for reference)
 | Guide | Description |
 |-------|-------------|
 | [Agent Integration Guide](docs/AGENT_INTEGRATION.md) | Step-by-step integration for AI agents and pipelines |
-| [CPI/MI Guard Rules](docs/aer-cpi-mi-rules.md) | Trust lattice, taint model, policy customization |
 | [ClawHub Integration](docs/clawhub-integration.md) | ClawHub marketplace integration & ClawHavoc prevention |
 
 ### Technical Reference
@@ -646,7 +644,7 @@ packages/aer/           # Legacy AER source (preserved for reference)
 | Document | Description |
 |----------|-------------|
 | [Threat Model](docs/THREAT_MODEL.md) | AEGX security analysis and mitigations |
-| [AER Threat Model](docs/aer-threat-model.md) | AER security guarantees and assumptions |
+| [ClawHub Integration](docs/clawhub-integration.md) | ClawHub marketplace & ClawHavoc prevention |
 | [Changelog](docs/CHANGELOG.md) | Release notes |
 
 ## License
