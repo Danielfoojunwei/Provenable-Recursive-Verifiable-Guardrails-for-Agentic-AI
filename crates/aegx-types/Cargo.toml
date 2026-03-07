@@ -1,0 +1,16 @@
+[package]
+name = "aegx-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified types and canonical hashing for AEGX — Provenable Recursive Verifiable Guardrails"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+chrono = { workspace = true }
+bitflags = { workspace = true }
+unicode-normalization = { workspace = true }
+thiserror = { workspace = true }

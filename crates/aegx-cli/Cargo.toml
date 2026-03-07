@@ -1,0 +1,21 @@
+[package]
+name = "aegx-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified CLI for AEGX/AER"
+
+[[bin]]
+name = "aegx"
+path = "src/main.rs"
+
+[dependencies]
+aegx-types = { workspace = true }
+aegx-records = { workspace = true }
+aegx-bundle = { workspace = true }
+aegx-guard = { workspace = true }
+aegx-runtime = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }

@@ -1,0 +1,20 @@
+[package]
+name = "aegx-guard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Policy engine, scanner, and guard surfaces for AEGX"
+
+[dependencies]
+aegx-types = { workspace = true }
+aegx-records = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+chrono = { workspace = true }
+regex = { workspace = true }
+uuid = { workspace = true }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

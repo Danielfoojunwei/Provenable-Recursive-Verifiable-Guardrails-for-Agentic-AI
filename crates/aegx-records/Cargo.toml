@@ -1,0 +1,13 @@
+[package]
+name = "aegx-records"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Record I/O and audit chain for AEGX"
+
+[dependencies]
+aegx-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
