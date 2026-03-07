@@ -1,32 +1,43 @@
 ---
 name: provenable
-description: Provable security guardrails for agentic AI. Use when you need to audit agent actions, check protection status, query threat alerts, manage snapshots, verify evidence bundles, or enforce CPI/MI guard policies. Covers the proven-aer and aegx CLIs.
+description: Provable security guardrails for agentic AI. Audit agent actions, check protection status, query threat alerts, manage snapshots, verify evidence bundles, and enforce CPI/MI guard policies with the unified aegx CLI.
 user-invocable: true
-metadata: {"openclaw":{"emoji":"shield","os":["linux","darwin"],"requires":{"bins":["proven-aer","aegx"]},"install":[{"url":"https://github.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI.git","targetDir":"~/.aegx"}]}}
+metadata: {"openclaw":{"emoji":"shield","os":["linux","darwin"],"requires":{"bins":["aegx"]},"install":[{"url":"https://github.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI.git","targetDir":"~/.aegx"}]}}
 ---
 
-# Provenable.ai — Provable Security Guardrails
+# Provenable.ai — Provable Security Guardrails for Agentic AI
 
-Two CLIs: `proven-aer` (runtime guards + snapshots + alerts) and `aegx` (evidence bundles).
+> **This file is the skill definition.** Import this repo as a skill in
+> [OpenClaw](https://openclaw.ai), [Claude Code](https://claude.ai),
+> [Manus](https://manus.im), or any agent platform that reads `SKILL.md`.
+> See also: [`AGENT.md`](AGENT.md) for agent-level integration instructions.
+
+Single CLI: `aegx` — unified evidence format, runtime guards, snapshots,
+rollback, bundle verification, and `/prove` query interface.
 
 ## Setup (one-time)
 
-If the binaries are not on PATH, run the setup script:
+Build from source:
 
 ```bash
-bash {baseDir}/scripts/setup.sh
+cd {baseDir}
+cargo build --workspace --release
+export PATH="{baseDir}/target/release:$PATH"
 ```
 
-Then initialize AER:
+Initialize the guardrail runtime:
 
 ```bash
-proven-aer init
+aegx init
 ```
+
+Creates the state directory, installs the default policy, and sets up the
+workspace. Outputs a policy summary showing the default rules.
 
 ## Quick Status — "How am I protected?"
 
 ```bash
-proven-aer prove --json
+aegx prove --json
 ```
 
 Returns protection summary, threat alerts, guard metrics, and system health as JSON.
@@ -34,7 +45,7 @@ Returns protection summary, threat alerts, guard metrics, and system health as J
 Human-readable output (no `--json`):
 
 ```bash
-proven-aer prove
+aegx prove
 ```
 
 ## Query Alerts
@@ -42,25 +53,25 @@ proven-aer prove
 Show recent alerts:
 
 ```bash
-proven-aer prove --limit 10
+aegx prove --limit 10
 ```
 
 Filter by severity:
 
 ```bash
-proven-aer prove --severity CRITICAL
+aegx prove --severity CRITICAL
 ```
 
 Filter by threat category and time range:
 
 ```bash
-proven-aer prove --category CPI --since 2026-02-01T00:00:00Z
+aegx prove --category CPI --since 2026-02-01T00:00:00Z
 ```
 
 ## Check System Health
 
 ```bash
-proven-aer status
+aegx status
 ```
 
 Shows: initialized state, record count, audit chain integrity, snapshot count.
@@ -70,19 +81,19 @@ Shows: initialized state, record count, audit chain integrity, snapshot count.
 Create a snapshot before risky operations:
 
 ```bash
-proven-aer snapshot create "pre-deploy" --scope full
+aegx snapshot create "pre-deploy" --scope full
 ```
 
 List snapshots:
 
 ```bash
-proven-aer snapshot list
+aegx snapshot list
 ```
 
 Rollback to a snapshot:
 
 ```bash
-proven-aer rollback <SNAPSHOT_ID>
+aegx rollback <SNAPSHOT_ID>
 ```
 
 ## Evidence Bundles
@@ -90,106 +101,105 @@ proven-aer rollback <SNAPSHOT_ID>
 Export an evidence bundle for audit:
 
 ```bash
-proven-aer bundle export --agent <AGENT_ID>
+aegx bundle export --agent <AGENT_ID>
 ```
 
 Verify a bundle:
 
 ```bash
-proven-aer verify <BUNDLE_PATH>
-aegx verify <BUNDLE_DIR>
+aegx verify <BUNDLE_PATH>
 ```
 
-Summarize a bundle:
+Generate a report from a bundle:
 
 ```bash
-aegx summarize <BUNDLE_DIR>
+aegx report <BUNDLE_PATH>
 ```
 
 ## Guard Behavior
 
-When AER denies an action:
+When the guard denies an action:
 
 1. The denial is automatically recorded as a `GuardDecision` record
 2. A `ThreatAlert` is emitted with severity and category
 3. Do NOT retry the same action — the policy will deny it again
 4. Escalate to the user or choose an alternative path
 
-## Host Environment Hardening (v0.1.6)
+## Guard Surfaces (v0.2.0)
 
-AER v0.1.6 adds four new guard surfaces:
+### Control-Plane Integrity (CPI)
+
+Blocks untrusted principals from modifying skills, tools, permissions, and
+gateway configuration. Only `USER` and `SYS` principals can alter the control
+plane. Cross-surface integration: CPI denial escalates MI taint for that
+principal.
+
+### Memory Integrity (MI)
+
+Blocks untrusted writes to durable memory files (`SOUL.md`, `AGENTS.md`,
+`TOOLS.md`, `USER.md`, `IDENTITY.md`, `HEARTBEAT.md`, `MEMORY.md`). All
+writes route through the hooks pipeline for full audit trail.
+
+### Conversation I/O (Noninterference)
+
+8-category prompt injection scanner analyzes inbound messages. Output leakage
+detector scans outbound responses for system prompt tokens. Injection detected
+in a session taints all subsequent operations session-wide.
 
 ### File Read Guard
 
 Blocks untrusted principals from reading sensitive files:
 - Denied: `.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`
-- Tainted: `.aws/*`, `.ssh/*`, `.gnupg/*` propagate `SECRET_RISK` to downstream derivations
+- Tainted: `.aws/*`, `.ssh/*`, `.gnupg/*` propagate `SECRET_RISK`
 
 ### Network Egress Monitor
 
 Evaluates outbound requests against domain blocklist/allowlist:
 - Blocked by default: `webhook.site`, `requestbin.com`, `pipedream.net`, `canarytokens.com`, `interact.sh`
-- When allowlist is non-empty, only listed domains are permitted
 
 ### Sandbox Audit
 
 Verifies OS execution environment at session start:
 - Container detection (Docker, Kubernetes)
-- Seccomp filter status
-- Namespace isolation (PID, net, mnt, user)
+- Seccomp filter status, namespace isolation
 - Emits CRITICAL alert if no sandboxing detected
 
-### Dynamic Token Registry
+### Cross-Surface Threat Correlation (v0.2.0)
 
-Caches system prompt tokens for output guard discovery:
-- SCREAMING_CASE tokens, camelCase identifiers, `${params.*}` template variables
-- Three-tier fallback: caller config → registry → static watchlist
-
-## Channel Integration (Telegram, WhatsApp, etc.)
-
-Messages from Telegram, WhatsApp, and other external channels are assigned `Principal::Channel` (trust level 0). This means:
-
-- **CPI**: All control-plane changes from channel messages are **DENIED** (skill installs, tool registrations, permission changes)
-- **MI**: All memory writes from channel messages are **DENIED** (SOUL.md, AGENTS.md, TOOLS.md, etc.)
-- **Audit**: Every channel session, message, and guard decision is recorded with full provenance
-
-Channel metadata is captured in session records:
-
-```bash
-# Session start from Telegram — channel="telegram"
-# Session start from WhatsApp — channel="whatsapp"
-# All channel messages use Principal::Channel (trust level 0)
-```
-
-For channel-specific configuration and security best practices, see `{baseDir}/references/channel-integration.md`.
-
-## Reference Files
-
-- **Full CLI reference:** Read `{baseDir}/references/cli-reference.md`
-- **Alert categories and severities:** Read `{baseDir}/references/alert-categories.md`
-- **CPI/MI guard policies:** Read `{baseDir}/references/guard-policies.md`
-- **Query patterns and examples:** Read `{baseDir}/references/query-patterns.md`
-- **Natural language query mapping:** Read `{baseDir}/references/chat-queries.md`
-- **Channel integration (Telegram, WhatsApp):** Read `{baseDir}/references/channel-integration.md`
+- CPI denial → MI taint escalation for that principal
+- Injection detection → session-wide taint across all surfaces
+- Cross-surface denial count → RVU auto-rollback threshold
 
 ## Common Chat Queries Mapped to Commands
 
 | User says | Run |
 |-----------|-----|
-| "Am I protected?" | `proven-aer prove --json` |
-| "Any threats?" | `proven-aer prove --severity MEDIUM --limit 20` |
-| "Show critical alerts" | `proven-aer prove --severity CRITICAL` |
-| "What did the guard block?" | `proven-aer prove --category CPI` |
-| "System health" | `proven-aer status` |
-| "Take a snapshot" | `proven-aer snapshot create "user-requested"` |
-| "List snapshots" | `proven-aer snapshot list` |
-| "Roll back" | `proven-aer snapshot list` then `proven-aer rollback <ID>` |
-| "Export evidence" | `proven-aer bundle export` |
-| "Verify this bundle" | `proven-aer verify <PATH>` |
-| "Guard performance" | `proven-aer prove --json` (check `.metrics`) |
-| "Is my environment sandboxed?" | `proven-aer prove --json` (check sandbox compliance in health) |
-| "Any file read blocks?" | `proven-aer prove --category MI --json` |
-| "Any exfil attempts?" | `proven-aer prove --category INJECTION --json` |
+| "Am I protected?" | `aegx prove --json` |
+| "Any threats?" | `aegx prove --severity MEDIUM --limit 20` |
+| "Show critical alerts" | `aegx prove --severity CRITICAL` |
+| "What did the guard block?" | `aegx prove --category CPI` |
+| "System health" | `aegx status` |
+| "Take a snapshot" | `aegx snapshot create "user-requested"` |
+| "List snapshots" | `aegx snapshot list` |
+| "Roll back" | `aegx snapshot list` then `aegx rollback <ID>` |
+| "Export evidence" | `aegx bundle export` |
+| "Verify this bundle" | `aegx verify <PATH>` |
+| "Guard performance" | `aegx prove --json` (check `.metrics`) |
+| "Is my environment sandboxed?" | `aegx prove --json` (check sandbox in health) |
+
+## CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `aegx init` | Initialize state dirs, default policy, workspace |
+| `aegx status` | Show initialization status, counts, chain validity |
+| `aegx snapshot create <name> [--scope full\|cp\|mem]` | Create a named snapshot |
+| `aegx snapshot list` | List existing snapshots |
+| `aegx rollback <snapshot-id>` | Rollback to a previous snapshot |
+| `aegx bundle export [--agent <id>] [--since <ts>]` | Export evidence bundle |
+| `aegx verify <path>` | Verify bundle integrity (10-step) |
+| `aegx report <path>` | Generate report from bundle |
+| `aegx prove [--json] [--category <cat>] [--severity <sev>] [--since <ts>]` | Query protection status |
 
 ## Safety Rules
 

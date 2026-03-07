@@ -11,6 +11,22 @@ single system grounded in first principles.
 
 ---
 
+## Use as an Agent Skill
+
+> **Want to add provable security guardrails to your AI agent?**
+> This repo is ready to use as a skill on any agent platform.
+
+| File | Purpose | Platform |
+|------|---------|----------|
+| **[`SKILL.md`](SKILL.md)** | Skill manifest and command reference | OpenClaw, Claude Code, Manus, any platform reading `SKILL.md` |
+| **[`AGENT.md`](AGENT.md)** | Agent integration guide with architecture, trust model, and platform-specific setup | All agent platforms |
+
+**Quick start:** Clone this repo, run `cargo build --workspace --release`,
+then `aegx init`. Your agent reads `SKILL.md` to learn available commands
+and `AGENT.md` for integration context.
+
+---
+
 ## The Problem — Empirical Evidence
 
 Agentic AI systems operate with increasing autonomy — calling tools, modifying
