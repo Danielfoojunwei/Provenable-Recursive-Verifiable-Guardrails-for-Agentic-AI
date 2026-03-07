@@ -10,8 +10,9 @@ use std::io;
 
 /// Single chokepoint for all workspace memory writes.
 ///
-/// All memory file mutations must go through this function.
-/// If denied by the MI guard, the write is NOT applied.
+/// Routes through `hooks::on_file_write()` which provides the full
+/// guard → record → audit → rollback policy → alert pipeline.
+/// This ensures memory writes have a complete, auditable trail.
 pub fn write_memory_file(
     filename: &str,
     content: &[u8],
@@ -32,23 +33,24 @@ pub fn write_memory_file(
     let file_path_str = file_path.to_string_lossy().to_string();
     let content_hash = sha256_hex(content);
 
-    // Evaluate the MI guard
-    let verdict = aegx_guard::gate_memory_write(
+    // Route through hooks for full audit trail (guard + record + audit + rollback)
+    let result = crate::hooks::on_file_write(
         principal,
         taint,
         approved,
         &file_path_str,
-        &content_hash,
+        content,
         parent_records,
     )?;
 
-    match verdict {
-        GuardVerdict::Allow => {
+    match result {
+        Ok(_record) => {
+            // hooks::on_file_write validates but doesn't write — we apply the mutation
             fs::create_dir_all(&workspace)?;
             fs::write(&file_path, content)?;
             Ok(Ok(content_hash))
         }
-        GuardVerdict::Deny => Ok(Err(format!(
+        Err(_denial_record) => Ok(Err(format!(
             "MI guard denied write to {} for {:?}",
             filename, principal
         ))),
