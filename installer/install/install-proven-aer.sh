@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # install-proven-aer.sh — Install Provenable.ai AER on macOS / Linux
+# DEPRECATED — See installer/DEPRECATED.md
 # MIT License — Copyright (c) 2026 Daniel Foo Jun Wei
 set -euo pipefail
 

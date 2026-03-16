@@ -207,4 +207,4 @@ Any modification to any record is detectable by any verifier.
 - [`SKILL.md`](SKILL.md) — Skill manifest and full command reference
 - [`README.md`](README.md) — Complete project documentation
 - [`docs/AGENT_INTEGRATION.md`](docs/AGENT_INTEGRATION.md) — Detailed integration guide
-- [`docs/aer-cpi-mi-rules.md`](docs/aer-cpi-mi-rules.md) — Guard policy customization
+- [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) — Full CLI command reference

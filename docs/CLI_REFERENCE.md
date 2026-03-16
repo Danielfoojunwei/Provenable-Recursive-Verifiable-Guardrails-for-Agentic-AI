@@ -1,6 +1,6 @@
 # AEGX CLI Reference
 
-Complete reference for every `aegx` command, flag, and exit code.
+Complete reference for the unified `aegx` command-line interface (v0.2.0).
 
 ---
 
@@ -8,421 +8,32 @@ Complete reference for every `aegx` command, flag, and exit code.
 
 ```
 aegx <COMMAND> [OPTIONS]
+aegx --version
+aegx --help
 ```
 
 | Command | Purpose |
 |---------|---------|
-| `init` | Create a new empty bundle |
-| `add-blob` | Copy a file into the bundle's blob store |
-| `add-record` | Append a typed record to the bundle |
-| `export` | Package a bundle directory into a zip |
-| `import` | Extract a zip into a bundle directory |
-| `verify` | Check bundle integrity end-to-end |
-| `summarize` | Print record counts and verification status |
+| `init` | Initialize AEGX in the current state directory |
+| `status` | Show system health and initialization state |
+| `snapshot create` | Capture a state snapshot |
+| `snapshot list` | List existing snapshots |
+| `rollback` | Restore state from a snapshot |
+| `bundle export` | Export an evidence bundle |
+| `verify` | Verify an evidence bundle |
+| `report` | Generate a report from an evidence bundle |
+| `prove` | Query what Provenable.ai has protected |
 
 ---
 
 ## `aegx init`
 
-Create a new AEGX bundle directory with empty manifest, records, audit log, and blobs folder.
+Initialize AEGX in the current Provenable.ai state directory. Creates all required directories, installs the default deny-by-default policy, and ensures the workspace directory exists.
 
 ### Usage
 
 ```bash
-aegx init <BUNDLE_DIR> [--zip-out <PATH>]
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `BUNDLE_DIR` | Yes | Path for the new bundle directory |
-| `--zip-out PATH` | No | Also export the initialized bundle as a zip |
-
-### What It Creates
-
-```
-BUNDLE_DIR/
-  manifest.json       # aegx_version=0.1, record_count=0, blob_count=0
-  records.jsonl       # empty file
-  audit-log.jsonl     # empty file
-  blobs/              # empty directory
-```
-
-### Example
-
-```bash
-aegx init evidence.aegx
-# Output: Initialized bundle: evidence.aegx
-
-aegx init evidence.aegx --zip-out evidence.aegx.zip
-# Output: Initialized bundle: evidence.aegx
-#         Exported to: evidence.aegx.zip
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Bundle created successfully |
-| 4 | I/O error (cannot create directory, permission denied) |
-
----
-
-## `aegx add-blob`
-
-Copy a file from disk into the bundle's `blobs/` directory, named by its SHA-256 hash.
-
-### Usage
-
-```bash
-aegx add-blob <BUNDLE> <FILE_PATH> [--mime <MIME_TYPE>]
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `BUNDLE` | Yes | Path to the bundle directory |
-| `FILE_PATH` | Yes | Path to the file to add |
-| `--mime TYPE` | No | MIME type (default: `application/octet-stream`). Stored for reference only. |
-
-### Behavior
-
-1. Reads the file at `FILE_PATH`
-2. Computes `sha256(file_bytes)`
-3. Copies to `BUNDLE/blobs/<sha256_hex>`
-4. If the blob already exists with identical content, skips the copy
-5. If the blob already exists with different content, returns an error
-6. Prints the SHA-256 hex to stdout
-
-### Example
-
-```bash
-aegx add-blob my.aegx report.pdf
-# Output: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Blob added (or already existed with same content) |
-| 4 | I/O error |
-
-### Important
-
-`add-blob` does NOT create a record. You must call `add-record` separately with the `--blob` flag to reference the blob in a record.
-
----
-
-## `aegx add-record`
-
-Append a typed record to `records.jsonl`, append a corresponding audit entry to `audit-log.jsonl`, and update `manifest.json`.
-
-### Usage
-
-```bash
-# Inline payload
-aegx add-record <BUNDLE> \
-  --type <RECORD_TYPE> \
-  --principal <PRINCIPAL> \
-  --meta <JSON> \
-  [--parents <ID>,<ID>,...] \
-  --inline <JSON>
-
-# Blob payload
-aegx add-record <BUNDLE> \
-  --type <RECORD_TYPE> \
-  --principal <PRINCIPAL> \
-  --meta <JSON> \
-  [--parents <ID>,<ID>,...] \
-  --blob <SHA256> --mime <MIME_TYPE> --size <BYTES>
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `BUNDLE` | Yes | Path to the bundle directory |
-| `--type TYPE` | Yes | Record type (see table below) |
-| `--principal P` | Yes | Principal who produced this record |
-| `--meta JSON` | Yes | JSON object; must contain `"ts"` (RFC3339 timestamp) |
-| `--parents ID,...` | No | Comma-separated list of parent record IDs |
-| `--inline JSON` | One of | Inline JSON payload |
-| `--blob SHA256` | One of | SHA-256 of the referenced blob (must already exist in blobs/) |
-| `--mime TYPE` | With blob | MIME type of the blob |
-| `--size BYTES` | With blob | Size of the blob in bytes |
-
-### Record Types
-
-| Type | When to Use |
-|------|-------------|
-| `SessionStart` | Beginning of an agent session |
-| `SessionMessage` | A message within a session (user or agent) |
-| `ToolCall` | Agent invokes a tool |
-| `ToolResult` | Tool returns a result |
-| `FileRead` | Agent reads a file |
-| `FileWrite` | Agent writes a file |
-| `FileDelete` | Agent deletes a file |
-| `ControlPlaneChangeRequest` | Attempt to modify system config |
-| `MemoryCommitRequest` | Attempt to write to persistent memory |
-| `GuardDecision` | A CPI/MI guard allowed or denied an action |
-| `Snapshot` | State snapshot was taken |
-| `Rollback` | State was rolled back to a snapshot |
-
-### Principals
-
-| Principal | Description |
-|-----------|-------------|
-| `USER` | Human operator |
-| `SYS` | System / runtime |
-| `WEB` | Web-sourced input |
-| `TOOL` | Tool plugin |
-| `SKILL` | Skill module |
-| `CHANNEL` | Communication channel |
-| `EXTERNAL` | External / untrusted source |
-
-### Behavior
-
-1. Parses and validates all inputs
-2. Normalizes `meta.ts` to RFC3339 `"Z"` form
-3. Computes `recordId = sha256(CANON({type, principal, taint, parents, meta, payload, schema}))`
-4. Appends the record as one JSON line to `records.jsonl`
-5. Appends an audit entry to `audit-log.jsonl` (chained to previous via hash)
-6. Updates manifest: `record_count`, `audit_head`, `root_records`, `blob_count`
-7. Prints the `recordId` to stdout
-
-### Example
-
-```bash
-# Inline record
-RID=$(aegx add-record my.aegx \
-  --type SessionStart \
-  --principal SYS \
-  --meta '{"ts":"2026-02-15T10:00:00Z"}' \
-  --inline '{"reason":"new session"}')
-
-# Record referencing a blob
-aegx add-record my.aegx \
-  --type FileWrite \
-  --principal TOOL \
-  --meta '{"ts":"2026-02-15T10:01:00Z","path":"/app/config.json"}' \
-  --parents "$RID" \
-  --blob "e3b0c442..." \
-  --mime "application/json" \
-  --size 1024
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Record added |
-| 1 | Invalid arguments (bad type, principal, JSON) |
-| 4 | I/O error |
-
----
-
-## `aegx export`
-
-Package a bundle directory into a zip archive.
-
-### Usage
-
-```bash
-aegx export <BUNDLE_DIR> <OUT_ZIP>
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `BUNDLE_DIR` | Yes | Path to the bundle directory |
-| `OUT_ZIP` | Yes | Output zip file path |
-
-### Example
-
-```bash
-aegx export my.aegx my.aegx.zip
-# Output: Exported: my.aegx.zip
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Zip created |
-| 4 | I/O error |
-
----
-
-## `aegx import`
-
-Extract a zip archive into a bundle directory.
-
-### Usage
-
-```bash
-aegx import <BUNDLE_ZIP> <OUT_DIR>
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `BUNDLE_ZIP` | Yes | Path to the zip file |
-| `OUT_DIR` | Yes | Directory to extract into |
-
-### Example
-
-```bash
-aegx import my.aegx.zip imported.aegx
-# Output: Imported: imported.aegx
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Extracted |
-| 4 | I/O error |
-
----
-
-## `aegx verify`
-
-Run all integrity checks on a bundle. This is the core trust operation.
-
-### Usage
-
-```bash
-aegx verify <BUNDLE>
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `BUNDLE` | Yes | Path to a bundle directory |
-
-### Checks Performed
-
-1. Validate `manifest.json` against the manifest JSON Schema
-2. Validate every record in `records.jsonl` against the record JSON Schema
-3. Validate every entry in `audit-log.jsonl` against the audit-entry JSON Schema
-4. Recompute `recordId` for each record and compare to the stored value
-5. Check that every parent reference points to an existing record
-6. Check that every referenced blob file exists in `blobs/`
-7. Recompute SHA-256 of each blob file and compare to its filename
-8. Verify the audit chain: sequential `idx`, correct `prev` linking, recomputed `entryHash`
-9. Compare computed audit head to `manifest.audit_head`
-10. Compare actual `record_count` and `blob_count` to manifest values
-11. Check that all `root_records` IDs exist
-
-### Output
-
-On success:
-
-```
-Verification: PASS
-```
-
-On failure, prints each error to stderr, one per line:
-
-```
-records.jsonl line 2: recordId mismatch: expected=abc..., got=def...
-audit entry 1: expected prev=111..., got prev=222...
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | All checks passed |
-| 2 | Verification failure (tamper detected, hash mismatch, broken chain) |
-| 3 | Schema validation failure (missing field, wrong type, invalid value) |
-| 4 | I/O error (file not found, unreadable) |
-
----
-
-## `aegx summarize`
-
-Print a summary of bundle contents and verification status.
-
-### Usage
-
-```bash
-aegx summarize <BUNDLE>
-```
-
-### Example Output
-
-```
-Records: 5
-By type:
-  FileWrite: 2
-  SessionMessage: 1
-  SessionStart: 1
-  ToolCall: 1
-By principal:
-  SYS: 1
-  TOOL: 3
-  USER: 1
-Verification: PASS
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Summary printed |
-| 4 | I/O error |
-
----
-
-## Exit Code Summary
-
-| Code | Name | Meaning |
-|------|------|---------|
-| 0 | Success | Operation completed / verification passed |
-| 1 | Argument Error | Invalid command-line arguments |
-| 2 | Verification Failure | Integrity check failed (tampering detected) |
-| 3 | Schema Failure | JSON Schema validation failed |
-| 4 | I/O Error | File system error |
-
----
-
-# proven-aer CLI Reference
-
-The AER (Agent Evidence & Recovery) runtime manages CPI/MI guardrails, snapshots, rollback, and incident bundle export. Build it from `packages/aer/`:
-
-```bash
-cd packages/aer
-cargo build --release --locked
-# Binary: target/release/proven-aer
-```
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PRV_STATE_DIR` | — | Override the state directory entirely (highest priority) |
-| `PRV_HOME` | — | Set the Provenable.ai home directory (second priority) |
-| `HOME` | `/tmp` | Used to derive default path `~/.proven` (fallback) |
-
-**Precedence:** `PRV_STATE_DIR` > `PRV_HOME` > `$HOME/.proven`
-
----
-
-## `proven-aer init`
-
-Initialize the AER subsystem in the Provenable.ai state directory.
-
-### Usage
-
-```bash
-proven-aer init
+aegx init
 ```
 
 No arguments.
@@ -430,7 +41,7 @@ No arguments.
 ### What It Creates
 
 ```
-~/.proven/.aer/
+<STATE_DIR>/.aer/
   policy/default.yaml       # deny-by-default CPI + MI rules
   records/records.jsonl     # event log
   records/blobs/            # blob store
@@ -438,6 +49,9 @@ No arguments.
   snapshots/                # snapshot storage
   bundles/                  # exported evidence bundles
   reports/                  # generated reports
+  alerts/                   # alert storage
+
+<STATE_DIR>/workspace/      # guarded workspace memory directory
 ```
 
 ### Default Policies Installed
@@ -445,49 +59,98 @@ No arguments.
 - **CPI:** deny control-plane changes from non-USER/SYS principals
 - **MI:** deny memory writes with tainted provenance
 - **MI:** deny memory writes from untrusted principals
-- All read operations: allowed
+- **CIO:** deny injection-suspected conversation messages
+- All clean operations: allowed
+
+### Example
+
+```bash
+aegx init
+# Output:
+# Initializing AEGX...
+#   Created AEGX directories under /home/user/.proven/.aer
+#   Installed default policy: /home/user/.proven/.aer/policy/default.yaml
+#   Ensured workspace directory: /home/user/.proven/workspace
+#
+# AEGX initialized successfully.
+#
+# Policy summary:
+#   - CPI: deny control-plane changes from non-USER/SYS principals
+#   - MI: deny memory writes with tainted provenance
+#   - MI: deny memory writes from untrusted principals
+#   - CIO: deny injection-suspected conversation messages
+#   - All clean operations: allowed
+#
+# State directory: /home/user/.proven
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Initialization completed successfully |
+| 1 | I/O error (cannot create directories, permission denied) |
 
 ---
 
-## `proven-aer status`
+## `aegx status`
 
-Show the current state of the AER subsystem.
+Show the current state of the AEGX subsystem, including record counts, audit chain integrity, and snapshot count.
 
 ### Usage
 
 ```bash
-proven-aer status
+aegx status
 ```
 
-### Example Output (Initialized)
+No arguments.
+
+### Behavior
+
+If AEGX has not been initialized, prints a message directing the user to run `aegx init`. Otherwise displays:
+
+- State directory and AEGX root paths
+- Total record count
+- Audit chain entry count
+- Snapshot count
+- Audit chain integrity status (VALID or BROKEN)
+
+### Example (Initialized)
 
 ```
-AER: initialized
+AEGX: initialized
 State directory: /home/user/.proven
-AER root: /home/user/.proven/.aer
+AEGX root: /home/user/.proven/.aer
 Records: 42
 Audit chain entries: 42
 Snapshots: 3
-Audit chain integrity: VALID
+Audit chain: VALID
 ```
 
-### Example Output (Not Initialized)
+### Example (Not Initialized)
 
 ```
-AER: not initialized
-Run `proven-aer init` to initialize.
+AEGX: not initialized
+Run `aegx init` to set up AEGX.
 ```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Status displayed successfully |
+| 1 | I/O error |
 
 ---
 
-## `proven-aer snapshot create`
+## `aegx snapshot create`
 
-Capture the current state of control-plane files, memory files, or both.
+Capture the current state of control-plane files, memory files, or both into a named snapshot.
 
 ### Usage
 
 ```bash
-proven-aer snapshot create <NAME> [--scope <SCOPE>]
+aegx snapshot create <NAME> [--scope <SCOPE>]
 ```
 
 ### Arguments
@@ -495,342 +158,389 @@ proven-aer snapshot create <NAME> [--scope <SCOPE>]
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `NAME` | Yes | Human-readable name for the snapshot |
-| `--scope SCOPE` | No | `full` (default), `control-plane` / `cp`, `memory` / `mem` |
+| `--scope SCOPE` | No | Scope of files to capture. Default: `full` |
 
-### Example
+### Scope Values
 
-```bash
-proven-aer snapshot create "before-refactor" --scope full
-proven-aer snapshot create "cp-backup" --scope cp
-proven-aer snapshot create "mem-backup" --scope mem
-```
-
-### Output
-
-```
-Snapshot created:
-  ID: a1b2c3d4
-  Name: before-refactor
-  Scope: Full
-  Files: 5
-  Created: 2026-02-15T10:00:00Z
-```
-
----
-
-## `proven-aer snapshot list`
-
-List all snapshots.
-
-### Usage
-
-```bash
-proven-aer snapshot list
-```
-
-### Example Output
-
-```
-a1b2c3d4  before-refactor  Full            5 files  2026-02-15T10:00:00Z
-e5f6a7b8  cp-backup        ControlPlane    2 files  2026-02-15T11:00:00Z
-```
-
----
-
-## `proven-aer rollback`
-
-Restore files to the state captured in a snapshot.
-
-### Usage
-
-```bash
-proven-aer rollback <SNAPSHOT_ID>
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `SNAPSHOT_ID` | Yes | The snapshot ID (from `snapshot list`) |
+| Value | Alias | Description |
+|-------|-------|-------------|
+| `full` | -- | Capture both control-plane and memory files (default) |
+| `control-plane` | `cp` | Capture control-plane files only |
+| `memory` | `mem` | Capture durable memory files only |
 
 ### Behavior
 
-1. Loads the snapshot manifest
-2. Calculates diff against current state (files to restore, files to recreate)
-3. Restores each file to its snapshotted content
-4. Verifies all file hashes match the snapshot
-5. Prints rollback report with PASS or FAIL
+1. Reads all files in the selected scope
+2. Stores file contents and computes hashes
+3. Creates a snapshot manifest with a unique ID
+4. Prints the snapshot ID, name, file count, and creation timestamp
 
 ### Example
 
 ```bash
-proven-aer rollback a1b2c3d4
+aegx snapshot create "before-refactor" --scope full
+# Output:
+# Creating snapshot 'before-refactor' (scope: full)...
+# Snapshot created:
+#   ID: a1b2c3d4e5f6a7b8...
+#   Name: before-refactor
+#   Files: 5
+#   Created: 2026-02-15T10:00:00+00:00
+
+aegx snapshot create "cp-backup" --scope cp
+aegx snapshot create "mem-backup" --scope mem
 ```
 
----
-
-## `proven-aer bundle export`
-
-Export an AEGX evidence bundle from the AER event log.
-
-### Usage
-
-```bash
-proven-aer bundle export [--agent <AGENT_ID>] [--since <ISO8601>]
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `--agent ID` | No | Filter records by agent ID |
-| `--since TS` | No | Filter records after this timestamp (RFC 3339) |
-
-### Example
-
-```bash
-proven-aer bundle export
-proven-aer bundle export --agent my-agent-v1 --since 2026-02-15T10:00:00Z
-```
-
-### Output
-
-Path to the exported `.aegx.zip` file.
-
----
-
-## `proven-aer verify`
-
-Verify an exported AER evidence bundle.
-
-### Usage
-
-```bash
-proven-aer verify <BUNDLE_PATH>
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `BUNDLE_PATH` | Yes | Path to the `.aegx.zip` file |
-
-### Output (Pass)
-
-```
-Valid: true
-Records checked: 42
-Audit entries checked: 42
-Blobs checked: 5
-PASS: Bundle integrity verified.
-```
-
-### Output (Fail)
-
-```
-Valid: false
-Errors:
-  - RecordHashMismatch: record 3 hash does not match
-FAIL: Bundle integrity check failed.
-```
-
----
-
-## `proven-aer report`
-
-Generate or display a Markdown report from an evidence bundle.
-
-### Usage
-
-```bash
-proven-aer report <BUNDLE_PATH>
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `BUNDLE_PATH` | Yes | Path to the `.aegx.zip` file |
-
-If the bundle already contains `report.md`, it is displayed. Otherwise a new report is generated from the records and audit log.
-
----
-
-## proven-aer Exit Codes
+### Exit Codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | Success |
-| 1 | Any error (invalid arguments, I/O failure, verification failure) |
-
+| 0 | Snapshot created successfully |
+| 1 | Invalid scope value or I/O error |
 
 ---
 
-## AER Usage Guide
+## `aegx snapshot list`
 
+List all existing snapshots.
 
-## Prerequisites
-
-Build the AER binary:
-
-```bash
-cd packages/aer
-cargo build --release
-```
-
-The binary is at `target/release/proven-aer`.
-
-## Environment
-
-AER uses the following environment variables:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PRV_STATE_DIR` | Root state directory | `~/.proven` |
-| `PRV_HOME` | Alternative to STATE_DIR | `~/.proven` |
-
-AER stores its state under `<STATE_DIR>/.aer/`.
-
-## Initialization
+### Usage
 
 ```bash
-proven-aer init
+aegx snapshot list
 ```
 
-This creates:
-- `<STATE_DIR>/.aer/policy/` — policy packs (YAML)
-- `<STATE_DIR>/.aer/records/` — records.jsonl + blobs/
-- `<STATE_DIR>/.aer/audit/` — audit-log.jsonl (hash chain)
-- `<STATE_DIR>/.aer/snapshots/` — snapshot manifests + blobs
-- `<STATE_DIR>/.aer/bundles/` — exported .aegx bundles
-- `<STATE_DIR>/.aer/reports/` — generated reports
+No arguments.
 
-A default policy is installed with deny-by-default rules for CPI and MI.
+### Behavior
 
-## Status
+Lists all snapshots with their truncated ID (first 8 characters), name, scope, file count, and creation timestamp. If no snapshots exist, prints "No snapshots found."
+
+### Example
+
+```
+Snapshots:
+  a1b2c3d4 -- before-refactor (Full, 5 files, 2026-02-15T10:00:00+00:00)
+  e5f6a7b8 -- cp-backup (ControlPlane, 2 files, 2026-02-15T11:00:00+00:00)
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | List displayed (including when empty) |
+| 1 | I/O error |
+
+---
+
+## `aegx rollback`
+
+Restore files to the state captured in a previous snapshot.
+
+### Usage
 
 ```bash
-proven-aer status
+aegx rollback <SNAPSHOT_ID>
 ```
 
-Shows record count, audit chain entries, snapshot count, and chain integrity.
+### Arguments
 
-## Snapshots
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `SNAPSHOT_ID` | Yes | The snapshot ID (full or prefix, as shown by `snapshot list`) |
 
-### Create a snapshot
+### Behavior
+
+1. Loads the snapshot manifest for the given ID
+2. Calculates the diff between current state and snapshot (files modified, files removed)
+3. If no changes are needed, reports that state already matches the snapshot
+4. Restores modified files to their snapshotted content
+5. Recreates any files that were deleted since the snapshot
+6. Verifies all restored file hashes match the snapshot
+7. Prints a rollback report listing restored files, recreated files, any errors, and a PASS/FAIL verification result
+
+### Example
 
 ```bash
-# Full snapshot (control-plane + memory)
-proven-aer snapshot create my-snapshot
-
-# Control-plane only
-proven-aer snapshot create pre-upgrade --scope control-plane
-
-# Memory only
-proven-aer snapshot create clean-state --scope memory
+aegx rollback a1b2c3d4e5f6a7b8
+# Output:
+# Rolling back to snapshot: a1b2c3d4 (before-refactor)
+#   Files to restore: 2
+#   Files to recreate: 1
+#
+# Rollback complete:
+#   Restored:
+#     /home/user/.proven/.aer/policy/default.yaml
+#     /home/user/.proven/workspace/SOUL.md
+#   Recreated:
+#     /home/user/.proven/workspace/TOOLS.md
+#   Verification: PASS
 ```
 
-### List snapshots
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Rollback completed (check verification status in output) |
+| 1 | Snapshot not found or I/O error |
+
+---
+
+## `aegx bundle export`
+
+Export an AEGX evidence bundle from the event log. The bundle is saved as a `.aegx.zip` file.
+
+### Usage
 
 ```bash
-proven-aer snapshot list
+aegx bundle export [--agent <AGENT_ID>] [--since <TIMESTAMP>]
 ```
 
-## Rollback
+### Arguments
 
-```bash
-proven-aer rollback <snapshot-id>
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--agent ID` | No | Filter records to only those belonging to this agent ID |
+| `--since TIMESTAMP` | No | Include only records after this timestamp (RFC 3339 format) |
 
-Rollback restores all files in the snapshot scope to their exact snapshotted content. A Rollback evidence record is emitted and the restored files are verified against snapshot hashes.
+### Behavior
 
-## Evidence Bundle Export
+1. Reads the current records, audit log, blobs, and policy from the AEGX state directory
+2. Applies any agent or time filters
+3. Packages everything into a `.aegx.zip` bundle
+4. Prints the path to the exported bundle
+
+### Example
 
 ```bash
 # Export all evidence
-proven-aer bundle export
+aegx bundle export
+# Output: Bundle exported: /home/user/.proven/.aer/bundles/bundle-2026-02-15T10:00:00Z.aegx.zip
 
-# Filter by agent
-proven-aer bundle export --agent agent-123
-
-# Filter by time
-proven-aer bundle export --since 2025-01-01T00:00:00Z
+# Filter by agent and time
+aegx bundle export --agent my-agent-v1 --since 2026-02-15T10:00:00Z
 ```
 
-The bundle is saved as a `.aegx.zip` file under `<STATE_DIR>/.aer/bundles/`.
+### Exit Codes
 
-Bundle contents:
-- `manifest.json` — bundle metadata
-- `records.jsonl` — evidence records
-- `audit-log.jsonl` — hash chain
-- `blobs/` — large payloads
-- `policy.yaml` — policy pack in effect
-- `report.md` — human-readable report
-- `report.json` — machine-readable report
+| Code | Meaning |
+|------|---------|
+| 0 | Bundle exported successfully |
+| 1 | Invalid timestamp format or I/O error |
 
-## Verification
+---
+
+## `aegx verify`
+
+Verify the integrity of an exported AEGX evidence bundle. This is the core trust operation.
+
+### Usage
 
 ```bash
-proven-aer verify <path-to-bundle.aegx.zip>
+aegx verify <BUNDLE_PATH>
 ```
 
-Checks:
-- Record ID hashes match content
-- Audit chain integrity (no gaps, no hash mismatches)
-- Blob hashes match references
-- Reports all errors found
+### Arguments
 
-## Report
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `BUNDLE_PATH` | Yes | Path to the `.aegx.zip` bundle file |
+
+### Checks Performed
+
+- Record ID hashes match record content
+- Audit chain integrity (sequential indexing, correct hash linking)
+- Blob file hashes match their references
+- Record count and blob count match manifest values
+- All errors are reported individually
+
+### Example (Pass)
+
+```
+Verifying bundle: evidence.aegx.zip
+Verification result:
+  Valid: true
+  Records checked: 42
+  Audit entries checked: 42
+  Blobs checked: 5
+
+PASS: Bundle integrity verified.
+```
+
+### Example (Fail)
+
+```
+Verifying bundle: evidence.aegx.zip
+Verification result:
+  Valid: false
+  Records checked: 42
+  Audit entries checked: 42
+  Blobs checked: 5
+  Errors:
+    [RecordHashMismatch] record 3 hash does not match
+
+FAIL: Bundle integrity check failed.
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | All integrity checks passed |
+| 1 | Bundle file not found or I/O error |
+| (process exits with code 1) | Verification failure (tamper detected, hash mismatch, broken chain) |
+
+---
+
+## `aegx report`
+
+Generate or display a Markdown report from an AEGX evidence bundle.
+
+### Usage
 
 ```bash
-proven-aer report <path-to-bundle.aegx.zip>
+aegx report <BUNDLE_PATH>
 ```
 
-Prints the evidence report (Markdown format) to stdout.
+### Arguments
 
-## Policy Customization
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `BUNDLE_PATH` | Yes | Path to the `.aegx.zip` bundle file |
 
-The default policy is at `<STATE_DIR>/.aer/policy/default.yaml`. You can edit it to customize guard rules.
+### Behavior
 
-Example rule structure:
+1. Extracts the bundle to a temporary directory
+2. If the bundle already contains a `report.md`, prints it to stdout
+3. Otherwise, reads records and audit log from the bundle and generates a new Markdown report
+4. Prints the report to stdout
 
-```yaml
-rules:
-  - id: my-custom-rule
-    surface: ControlPlane
-    action: Deny
-    condition:
-      principals:
-        - Web
-        - Skill
-    description: "Custom denial for web/skill principals"
+### Example
+
+```bash
+aegx report evidence.aegx.zip
+# Prints the Markdown report to stdout
 ```
 
-Available surfaces: `ControlPlane`, `DurableMemory`, `ConversationIO`, `FileSystem`, `NetworkIO`, `SandboxCompliance`
-Available actions: `Allow`, `Deny`
-Available principals: `Sys`, `User`, `ToolAuth`, `ToolUnauth`, `Web`, `Skill`, `Channel`, `External`
+### Exit Codes
 
-## Integration with OpenClaw (and Compatible Agentic Systems)
+| Code | Meaning |
+|------|---------|
+| 0 | Report generated and printed |
+| 1 | Bundle not found or I/O error |
 
-AER hooks into OpenClaw at these chokepoints:
+---
 
-1. **Tool dispatch**: `hooks::on_tool_call()` / `hooks::on_tool_result()`
-2. **Session logging**: `hooks::on_session_start()` / `hooks::on_session_message()`
-3. **Control-plane changes**: `hooks::on_control_plane_change()` — returns `Err` if denied
-4. **Memory writes**: `workspace::write_memory_file()` — returns `Err` if denied
-5. **Proxy trust detection**: `hooks::check_proxy_trust()` — emits audit warnings
-6. **Skill install verification**: `hooks::on_skill_install()` — pre-install skill scanning (v0.1.3)
-7. **File read guard**: `hooks::on_file_read()` — sensitive file access control (v0.1.6)
-8. **Outbound network**: `hooks::on_outbound_request()` — egress domain/payload evaluation (v0.1.6)
-9. **Sandbox audit**: `hooks::on_session_start()` — OS sandbox verification at session start (v0.1.6)
-10. **System prompt registry**: `hooks::on_system_prompt_available()` — dynamic token discovery activation (v0.1.6)
+## `aegx prove`
 
-### ClawHub / Skill Marketplace Integration
+Query what Provenable.ai has protected. This is the `/prove` interface -- it reads local AEGX state (records, audit log, alerts) and returns a summary of protection activity, threats detected, and system health.
 
-AER provides structural defense against supply-chain attacks on skill
-marketplaces like [ClawHub](https://clawhub.ai/). The `skill_verifier` module
-scans skill packages before installation for all 6 [ClawHavoc](https://www.esecurityplanet.com/threats/hundreds-of-malicious-skills-found-in-openclaws-clawhub/)
-attack vectors (shell commands, reverse shells, credential theft, memory
-poisoning, name collision, typosquatting).
+### Usage
 
-See [ClawHub Integration](clawhub-integration.md) for the full deep dive.
+```bash
+aegx prove [--json] [--category <CATEGORY>] [--severity <SEVERITY>] [--since <TIMESTAMP>] [--until <TIMESTAMP>] [--limit <N>]
+```
+
+### Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--json` | No | Output results as JSON instead of human-readable text |
+| `--category CAT` | No | Filter results by threat category (see table below) |
+| `--severity SEV` | No | Filter results by minimum severity level (see table below) |
+| `--since TIMESTAMP` | No | Include only events after this timestamp (RFC 3339) |
+| `--until TIMESTAMP` | No | Include only events before this timestamp (RFC 3339) |
+| `--limit N` | No | Maximum number of results to return |
+
+### Category Values
+
+| Value | Description |
+|-------|-------------|
+| `cpi` | Control-Plane Integrity violation |
+| `mi` | Memory Integrity violation |
+| `taint` | Taint propagation block |
+| `injection` | Prompt injection suspect |
+| `extraction` | Prompt extraction attempt |
+| `leakage` | Prompt leakage detection |
+| `proxy` | Proxy misconfiguration |
+| `rollback` | Automatic rollback triggered |
+| `contamination` | Cross-context contamination detected |
+
+### Severity Values
+
+| Value | Description |
+|-------|-------------|
+| `critical` | Highest severity -- immediate action required |
+| `high` | Significant threat detected |
+| `medium` | Moderate concern |
+| `info` | Informational event |
+
+### Behavior
+
+1. Reads local AEGX state (records, audit log, alerts)
+2. Applies any category, severity, time, or limit filters
+3. Includes system health and metrics in the response
+4. Outputs results in human-readable format (default) or JSON (`--json`)
+
+### Example
+
+```bash
+# Show all protection activity
+aegx prove
+
+# Show only critical CPI violations as JSON
+aegx prove --json --category cpi --severity critical
+
+# Show recent events with a limit
+aegx prove --since 2026-02-15T00:00:00Z --limit 10
+
+# Filter by time range and severity
+aegx prove --since 2026-02-01T00:00:00Z --until 2026-02-28T23:59:59Z --severity high
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Query executed and results displayed |
+| 1 | Invalid filter value (bad category, severity, or timestamp) or I/O error |
+
+---
+
+## Environment Variables
+
+AEGX resolves its state directory using the following environment variables, checked in order of precedence:
+
+| Variable | Priority | Description |
+|----------|----------|-------------|
+| `PRV_STATE_DIR` | 1 (highest) | Override the state directory path entirely |
+| `PRV_HOME` | 2 | Set the Provenable.ai home directory |
+| `HOME` | 3 (fallback) | Used to derive the default path `$HOME/.proven` |
+
+**Precedence:** `PRV_STATE_DIR` > `PRV_HOME` > `$HOME/.proven`
+
+If none of these variables are set, AEGX will refuse to start with a panic. It does not fall back to `/tmp` because that would be a security risk on multi-user systems.
+
+All AEGX state is stored under `<STATE_DIR>/.aer/`.
+
+### Example
+
+```bash
+# Use the default location (~/.proven)
+aegx status
+
+# Override with a custom state directory
+PRV_STATE_DIR=/opt/aegx/state aegx status
+
+# Set a custom Provenable.ai home
+PRV_HOME=/data/proven aegx status
+```
+
+---
+
+## Exit Code Summary
+
+| Code | Meaning |
+|------|---------|
+| 0 | Operation completed successfully |
+| 1 | Error (invalid arguments, I/O failure, verification failure, invalid filter values) |

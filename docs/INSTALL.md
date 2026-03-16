@@ -1,4 +1,4 @@
-# AEGX v0.1 Installation Guide
+# AEGX Installation Guide
 
 This guide covers every step needed to install the AEGX evidence bundle tool on your machine. It assumes no prior Rust experience.
 
@@ -37,14 +37,16 @@ winget install Rustlang.Rustup
 # OR download from https://rustup.rs and run the installer
 ```
 
+**Minimum supported Rust version (MSRV): 1.75+**
+
 After installing, verify:
 
 ```bash
 rustc --version
-# Expected: rustc 1.XX.0 or later
+# Expected: rustc 1.75.0 or later
 
 cargo --version
-# Expected: cargo 1.XX.0 or later
+# Expected: cargo 1.75.0 or later
 ```
 
 ### Git
@@ -85,7 +87,7 @@ The `--locked` flag ensures reproducible builds using the committed `Cargo.lock`
 Expected output (last lines):
 
 ```
-   Compiling aegx v0.1.0 (...)
+   Compiling aegx-cli v0.2.0 (...)
     Finished `release` profile [optimized] target(s) in XXs
 ```
 
@@ -99,7 +101,7 @@ Run the built-in test suite:
 cargo test --locked
 ```
 
-Expected: all tests pass (23 tests across 9 test binaries).
+Expected: all tests pass (161 tests across 6 crates).
 
 Then try the CLI:
 
@@ -110,26 +112,20 @@ Then try the CLI:
 Expected output:
 
 ```
-AEGX v0.1 evidence bundle tool
+AEGX — Provenable Recursive Verifiable Guardrails for Agentic AI
 
 Usage: aegx <COMMAND>
 
 Commands:
-  init        Initialize a new AEGX bundle
-  add-blob    Add a blob file to the bundle
-  add-record  Add a typed record to the bundle
-  export      Export bundle directory to zip
-  import      Import zip to bundle directory
-  verify      Verify bundle integrity
-  summarize   Summarize bundle contents
+  init        Initialize AEGX in the current Provenable.ai state directory
+  status      Show AEGX status
+  snapshot    Snapshot management
+  rollback    Rollback to a previous snapshot
+  bundle      Export an AEGX evidence bundle
+  verify      Verify an AEGX evidence bundle
+  report      Generate a report from an AEGX evidence bundle
+  prove       Query what Provenable.ai has protected — the /prove interface
   help        Print this message or the help of the given subcommand(s)
-```
-
-Run verification against the included test vectors:
-
-```bash
-./target/release/aegx verify tests/test_vectors/v0.1_minimal_bundle
-# Expected: Verification: PASS
 ```
 
 ---
@@ -139,10 +135,11 @@ Run verification against the included test vectors:
 To make `aegx` available anywhere on your system:
 
 ```bash
-cargo install --path . --locked
+cargo install --path crates/aegx-cli --locked
 ```
 
-This copies the binary to `~/.cargo/bin/aegx`. Verify:
+This is a Cargo workspace, so `--path crates/aegx-cli` is required (rather than `--path .`).
+The command copies the binary to `~/.cargo/bin/aegx`. Verify:
 
 ```bash
 aegx --help
@@ -211,7 +208,6 @@ export PATH="$PWD/target/release:$PATH"
 
 # Step 6: Confirm
 aegx --help
-aegx verify tests/test_vectors/v0.1_minimal_bundle
 ```
 
 ### Exit codes to check

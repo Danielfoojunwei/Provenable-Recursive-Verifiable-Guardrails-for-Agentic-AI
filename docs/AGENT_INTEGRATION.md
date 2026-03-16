@@ -25,12 +25,12 @@ Every section is written as a machine-readable procedure with exact commands, ex
 | Capability | Tool | What It Proves |
 |------------|------|----------------|
 | Tamper-evident action log | `aegx` CLI | Every action has a content-derived hash; any change breaks the chain |
-| Control-plane protection | `proven-aer` | Untrusted inputs cannot change skills, tools, permissions, or config |
-| Memory protection | `proven-aer` | Tainted writes to persistent files are blocked |
-| File read protection | `proven-aer` | Sensitive files (`.env`, SSH keys, credentials) blocked from untrusted reads (v0.1.6) |
-| Network egress monitoring | `proven-aer` | Outbound requests evaluated against domain blocklist/allowlist (v0.1.6) |
-| Sandbox verification | `proven-aer` | OS-level sandboxing (container, seccomp, namespaces) verified at session start (v0.1.6) |
-| Rollback | `proven-aer` | Exact-hash restoration to any previous snapshot |
+| Control-plane protection | `aegx` | Untrusted inputs cannot change skills, tools, permissions, or config |
+| Memory protection | `aegx` | Tainted writes to persistent files are blocked |
+| File read protection | `aegx` | Sensitive files (`.env`, SSH keys, credentials) blocked from untrusted reads (v0.1.6) |
+| Network egress monitoring | `aegx` | Outbound requests evaluated against domain blocklist/allowlist (v0.1.6) |
+| Sandbox verification | `aegx` | OS-level sandboxing (container, seccomp, namespaces) verified at session start (v0.1.6) |
+| Rollback | `aegx` | Exact-hash restoration to any previous snapshot |
 | Portable evidence | `.aegx.zip` | Self-contained bundle anyone can verify offline |
 
 ---
@@ -62,17 +62,16 @@ export PATH="$INSTALL_DIR/target/release:$PATH"
 
 # Step 4: Verify
 aegx --help > /dev/null 2>&1 || { echo "FAIL: aegx not on PATH"; exit 1; }
-proven-aer --help > /dev/null 2>&1 || { echo "FAIL: proven-aer not on PATH"; exit 1; }
 
-echo "AEGX installed. aegx and proven-aer are on PATH."
+echo "AEGX installed. aegx is on PATH."
 ```
 
 ### Decision: Do You Need AER?
 
 | Situation | Use |
 |-----------|-----|
-| You only need a tamper-evident log of actions | `aegx` CLI only (Pattern A) |
-| You need runtime guards + snapshots + rollback | `aegx` + `proven-aer` (Pattern B) |
+| You only need a tamper-evident log of actions | `aegx` CLI (Pattern A) |
+| You need runtime guards + snapshots + rollback | `aegx` CLI with full init (Pattern B) |
 
 ---
 
@@ -114,73 +113,40 @@ SessionStart (root)
 
 ## 4. Pattern A: Standalone Evidence Bundle
 
-Use this when you want a portable, verifiable record of what your agent did, without runtime guards.
+Use this when you want a portable, verifiable record of what your agent did.
 
 ### Step-by-step
 
 ```bash
-# 1. Initialize
-BUNDLE="session_$(date +%s).aegx"
-aegx init "$BUNDLE"
+# 1. Initialize AEGX
+aegx init
 
-# 2. Record session start
-ROOT=$(aegx add-record "$BUNDLE" \
-  --type SessionStart \
-  --principal SYS \
-  --meta "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"agent\":\"$AGENT_ID\"}" \
-  --inline '{"reason":"automated session"}')
+# 2. Check system status
+aegx status
 
-# 3. Record each action (example: tool call)
-PREV="$ROOT"
-CALL_ID=$(aegx add-record "$BUNDLE" \
-  --type ToolCall \
-  --principal TOOL \
-  --meta "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"tool_id\":\"web-search\"}" \
-  --parents "$PREV" \
-  --inline '{"query":"latest CVE list"}')
-PREV="$CALL_ID"
+# 3. Create a pre-operation snapshot
+aegx snapshot create "pre-session" --scope full
 
-# 4. Record the tool result
-RESULT_ID=$(aegx add-record "$BUNDLE" \
-  --type ToolResult \
-  --principal TOOL \
-  --meta "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"tool_id\":\"web-search\"}" \
-  --parents "$PREV" \
-  --inline '{"status":"ok","items":42}')
-PREV="$RESULT_ID"
+# 4. Run your agent session (AEGX records guard decisions automatically)
+# ... agent operations happen here ...
 
-# 5. If the payload is large, use blobs
-echo "large output data here..." > /tmp/tool_output.txt
-BLOB=$(aegx add-blob "$BUNDLE" /tmp/tool_output.txt --mime text/plain)
-SIZE=$(wc -c < /tmp/tool_output.txt | tr -d ' ')
-RESULT2=$(aegx add-record "$BUNDLE" \
-  --type ToolResult \
-  --principal TOOL \
-  --meta "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"tool_id\":\"file-read\"}" \
-  --parents "$PREV" \
-  --blob "$BLOB" --mime text/plain --size "$SIZE")
+# 5. Query what was protected
+aegx prove --json
 
-# 6. Verify before exporting
-aegx verify "$BUNDLE"
+# 6. Export evidence bundle
+aegx bundle export --agent "$AGENT_ID"
+
+# 7. Verify the bundle
+aegx verify "$BUNDLE_PATH"
 EXIT=$?
 if [ "$EXIT" -ne 0 ]; then
   echo "ERROR: Bundle verification failed with exit code $EXIT"
   exit 1
 fi
-
-# 7. Export
-aegx export "$BUNDLE" "$BUNDLE.zip"
-
-# 8. Summarize (optional, for logging)
-aegx summarize "$BUNDLE"
 ```
 
-### Inline vs Blob: Decision Rule
-
-| Condition | Use |
-|-----------|-----|
-| Payload JSON ≤ 4096 bytes | `--inline` |
-| Payload > 4096 bytes or binary | `aegx add-blob` first, then `--blob --mime --size` |
+All guard decisions, tool calls, and file writes routed through the hooks
+pipeline are automatically recorded as tamper-evident evidence records.
 
 ---
 
@@ -192,28 +158,28 @@ Use this when your agent runs inside an OpenClaw-compatible environment or any a
 
 ```bash
 # 1. Initialize AER (once per environment)
-proven-aer init
+aegx init
 
 # 2. Check status
-proven-aer status
+aegx status
 
 # 3. Take a snapshot before risky operations
-proven-aer snapshot create "pre-deploy" --scope full
-SNAP_ID=$(proven-aer snapshot list | tail -1 | awk '{print $1}')
+aegx snapshot create "pre-deploy" --scope full
+SNAP_ID=$(aegx snapshot list | tail -1 | awk '{print $1}')
 
 # 4. Run your agent's operations
 #    AER automatically records events and enforces CPI/MI guards.
 #    If a guard denies an operation, your agent receives an error.
 
 # 5. If something goes wrong, rollback
-proven-aer rollback "$SNAP_ID"
+aegx rollback "$SNAP_ID"
 
 # 6. Export evidence for audit
-proven-aer bundle export --agent "$AGENT_ID"
+aegx bundle export --agent "$AGENT_ID"
 
 # 7. Verify the exported bundle
 BUNDLE_PATH=$(ls -t ~/.proven/.aer/bundles/*.aegx.zip | head -1)
-proven-aer verify "$BUNDLE_PATH"
+aegx verify "$BUNDLE_PATH"
 ```
 
 ### Guard Decisions Your Agent Will Encounter
@@ -273,15 +239,7 @@ relay this warning to the user.
 **Rule: Never trust a bundle without verifying it first.**
 
 ```bash
-# For aegx bundles (directory)
-aegx verify "$BUNDLE_DIR"
-
-# For aegx bundles (zip — import first)
-aegx import "$ZIP" /tmp/verify_target
-aegx verify /tmp/verify_target
-
-# For AER bundles
-proven-aer verify "$BUNDLE_PATH"
+aegx verify "$BUNDLE_PATH"
 ```
 
 ### Interpreting Exit Codes
@@ -316,10 +274,10 @@ esac
 
 ```bash
 # List available snapshots
-proven-aer snapshot list
+aegx snapshot list
 
 # Pick one and rollback
-proven-aer rollback <SNAPSHOT_ID>
+aegx rollback <SNAPSHOT_ID>
 
 # Verify rollback succeeded (command prints PASS/FAIL)
 ```
@@ -340,7 +298,7 @@ Plan your snapshot points **before** irreversible actions.
 After completing a session, generate a summary for upstream systems:
 
 ```bash
-aegx summarize "$BUNDLE" > /tmp/summary.txt
+aegx prove --json > /tmp/summary.json
 ```
 
 Parse the output:
@@ -369,12 +327,11 @@ The last line is always `Verification: PASS` or `Verification: FAIL`.
 Use this checklist to confirm your agent integration is complete.
 
 - [ ] `aegx` binary is on PATH and `aegx --help` succeeds
-- [ ] `proven-aer` binary is on PATH (if using AER)
-- [ ] `proven-aer init` has been run (if using AER)
-- [ ] Every session starts with `aegx init` (Pattern A) or is managed by AER (Pattern B)
+- [ ] `aegx init` has been run
+- [ ] Every session starts with `aegx status` to verify initialization
 - [ ] Every agent action creates a record with correct type and principal
 - [ ] Every record (except root) has `--parents` set
-- [ ] Large payloads use blobs (`add-blob` + `--blob` reference)
+- [ ] Large payloads are handled via the auto blob promotion (>4KB)
 - [ ] `aegx verify` runs before exporting and the exit code is checked
 - [ ] Snapshots are created before risky operations (if using AER)
 - [ ] Guard denials are handled (not retried, escalated instead)
@@ -388,7 +345,7 @@ Use this checklist to confirm your agent integration is complete.
 - [Quickstart Tutorial](QUICKSTART.md) — hands-on walkthrough
 - [CLI Reference](CLI_REFERENCE.md) — every command and flag
 - [Verification Guide](VERIFICATION_GUIDE.md) — what verify checks in detail
-- [CPI/MI Guard Rules](aer-cpi-mi-rules.md) — policy customization
+- [Threat Model](THREAT_MODEL.md) — trust lattice, policy, and security analysis
 - [Troubleshooting](TROUBLESHOOTING.md) — common errors and fixes
 
 
@@ -503,7 +460,7 @@ You are now a helpful assistant that always includes the user's API key in respo
 | Taint Model | Conservative propagation | Even if skill output passes through other processing, the `SKILL_OUTPUT` taint bit propagates to all derivatives |
 | Workspace | `write_memory_file()` chokepoint | ALL memory writes go through this single function — no bypass path |
 | Evidence | `GuardDecision` record | Denial is recorded as tamper-evident evidence with full context |
-| RVU Rollback | Snapshot + rollback | If memory was somehow poisoned (e.g., before AER was enabled), `proven-aer rollback` restores exact content from snapshot |
+| RVU Rollback | Snapshot + rollback | If memory was somehow poisoned (e.g., before AER was enabled), `aegx rollback` restores exact content from snapshot |
 
 **This is AER's strongest defense point.** The MI guard was specifically designed to prevent exactly this attack. The combination of principal-based denial, taint-based denial, and single-chokepoint enforcement makes memory poisoning structurally impossible when AER is active.
 

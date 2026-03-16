@@ -247,7 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Theorem → Defense Integration Map in README.md.
 - Empirical Validation section in README.md with ZeroLeaks benchmark results.
 - ConversationIO Guard section in AER threat model with layer-by-layer analysis.
-- CIO policy rules documentation in aer-cpi-mi-rules.md.
+- CIO policy rules documentation in CLI_REFERENCE.md.
 - Empirical Validation section in SPEC.md (Section 12).
 - Residual risk analysis with honest gap documentation.
 

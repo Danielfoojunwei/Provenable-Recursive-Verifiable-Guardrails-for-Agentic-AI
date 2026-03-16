@@ -1,17 +1,18 @@
 # Troubleshooting
 
-Common errors, their causes, and fixes for both the `aegx` and `proven-aer` CLIs.
+Common errors, their causes, and fixes for the unified `aegx` CLI.
 
 ---
 
 ## Table of Contents
 
 1. [Build Errors](#1-build-errors)
-2. [aegx CLI Errors](#2-aegx-cli-errors)
+2. [Initialization and Status Errors](#2-initialization-and-status-errors)
 3. [Verification Failures](#3-verification-failures)
-4. [proven-aer Errors](#4-proven-aer-errors)
-5. [Snapshot and Rollback Issues](#5-snapshot-and-rollback-issues)
-6. [Bundle Export/Import Issues](#6-bundle-exportimport-issues)
+4. [Snapshot and Rollback Issues](#4-snapshot-and-rollback-issues)
+5. [Bundle Export Issues](#5-bundle-export-issues)
+6. [Guard Surface Errors](#6-guard-surface-errors)
+7. [Prove Query Issues](#7-prove-query-issues)
 
 ---
 
@@ -24,7 +25,7 @@ error[E0308]: mismatched types
    --> src/...
 ```
 
-**Cause:** Wrong Rust version.
+**Cause:** Wrong Rust version. AEGX requires Rust 1.75.0 or later.
 
 **Fix:**
 
@@ -75,55 +76,48 @@ source "$HOME/.cargo/env"
 
 ---
 
-## 2. aegx CLI Errors
+## 2. Initialization and Status Errors
 
-### `error: must specify --inline or --blob/--mime/--size`
+### `AEGX: not initialized`
 
-**Cause:** `add-record` requires either an inline payload or a blob reference. Neither was provided.
+**Cause:** `aegx init` has not been run yet.
 
-**Fix:** Add `--inline '{}'` for an inline payload, or `--blob <hash> --mime <type> --size <bytes>` for a blob.
+**Fix:**
 
-### `error: invalid meta JSON: ...`
+```bash
+aegx init
+```
 
-**Cause:** The `--meta` argument is not valid JSON.
+### `Bundle not found: <path>`
 
-**Fix:** Ensure the JSON is properly quoted. Use single quotes around the JSON string in bash:
+**Cause:** The specified `.aegx.zip` file does not exist at the given path.
+
+**Fix:** Check the path. Use `ls` to find the correct bundle:
+
+```bash
+ls ~/.proven/.aer/bundles/
+```
+
+### `Invalid timestamp '<ts>': ...`
+
+**Cause:** The `--since` or `--until` flag received a timestamp that is not valid RFC 3339.
+
+**Fix:** Use the format `YYYY-MM-DDTHH:MM:SSZ`:
 
 ```bash
 # Correct
---meta '{"ts":"2026-02-15T10:00:00Z"}'
+--since "2026-02-15T10:00:00Z"
 
-# Wrong (double quotes conflict with bash)
---meta "{"ts":"2026-02-15T10:00:00Z"}"
+# Wrong
+--since "2026-02-15 10:00:00"
+--since "Feb 15, 2026"
 ```
 
-### `error: invalid inline JSON: ...`
+### `Unknown scope: <scope>. Use: full, control-plane, memory`
 
-**Cause:** Same as above but for the `--inline` argument.
+**Cause:** Invalid `--scope` value for `aegx snapshot create`.
 
-**Fix:** Same — use single quotes.
-
-### `error: Unknown variant <TYPE>`
-
-**Cause:** Invalid record type string.
-
-**Fix:** Use one of: `SessionStart`, `SessionMessage`, `ToolCall`, `ToolResult`, `FileRead`, `FileWrite`, `FileDelete`, `ControlPlaneChangeRequest`, `MemoryCommitRequest`, `GuardDecision`, `Snapshot`, `Rollback`. These are case-sensitive.
-
-### `error: Unknown variant <PRINCIPAL>`
-
-**Cause:** Invalid principal string.
-
-**Fix:** Use one of: `USER`, `SYS`, `WEB`, `TOOL`, `SKILL`, `CHANNEL`, `EXTERNAL`. These are case-sensitive and uppercase.
-
-### `Initialized bundle: ... ` but no output from add-record
-
-**Cause:** The `add-record` command prints only the recordId to stdout. If you piped stderr somewhere, the errors are hidden.
-
-**Fix:** Check stderr:
-
-```bash
-aegx add-record ... 2>&1
-```
+**Fix:** Use one of: `full`, `control-plane` (or `cp`), `memory` (or `mem`).
 
 ---
 
@@ -136,7 +130,7 @@ If `aegx verify` exits silently with a non-zero code, errors are on stderr.
 **Fix:**
 
 ```bash
-aegx verify my_bundle 2>&1
+aegx verify my_bundle.aegx.zip 2>&1
 echo "Exit code: $?"
 ```
 
@@ -158,17 +152,13 @@ echo "Exit code: $?"
 
 **Cause:** A blob file was modified after being added.
 
-**Fix:** **Reject the bundle** or re-add the blob from the original file:
-
-```bash
-aegx add-blob my_bundle /path/to/original/file
-```
+**Fix:** **Reject the bundle.** If you created it, re-export with `aegx bundle export`.
 
 ### `manifest record_count=N but found M records`
 
 **Cause:** Records were added or removed without updating the manifest.
 
-**Fix:** If you created this bundle, re-run the operation that builds it. If you received it, **reject it**.
+**Fix:** If you created this bundle, re-export it. If you received it, **reject it**.
 
 ### `schema validation failed`
 
@@ -181,52 +171,7 @@ aegx add-blob my_bundle /path/to/original/file
 
 ---
 
-## 4. proven-aer Errors
-
-### `AER: not initialized`
-
-**Cause:** `proven-aer init` has not been run yet.
-
-**Fix:**
-
-```bash
-proven-aer init
-```
-
-### `Bundle not found: <path>`
-
-**Cause:** The specified `.aegx.zip` file does not exist at the given path.
-
-**Fix:** Check the path. Use `ls` to find the correct bundle:
-
-```bash
-ls ~/.proven/.aer/bundles/
-```
-
-### `Invalid timestamp '<ts>': ...`
-
-**Cause:** The `--since` flag received a timestamp that is not valid RFC 3339.
-
-**Fix:** Use the format `YYYY-MM-DDTHH:MM:SSZ`:
-
-```bash
-# Correct
---since "2026-02-15T10:00:00Z"
-
-# Wrong
---since "2026-02-15 10:00:00"
---since "Feb 15, 2026"
-```
-
-### `Unknown scope: <scope>. Use: full, control-plane, memory`
-
-**Cause:** Invalid `--scope` value for `snapshot create`.
-
-**Fix:** Use one of: `full`, `control-plane` (or `cp`), `memory` (or `mem`).
-
----
-
-## 5. Snapshot and Rollback Issues
+## 4. Snapshot and Rollback Issues
 
 ### No snapshots found
 
@@ -235,7 +180,7 @@ ls ~/.proven/.aer/bundles/
 **Fix:**
 
 ```bash
-proven-aer snapshot create "my-snapshot" --scope full
+aegx snapshot create "my-snapshot" --scope full
 ```
 
 ### Rollback reports "state already matches snapshot"
@@ -267,67 +212,67 @@ proven-aer snapshot create "my-snapshot" --scope full
 
 ---
 
-## 6. Bundle Export/Import Issues
+## 5. Bundle Export Issues
 
-### `aegx export` produces an empty zip
+### `aegx bundle export` produces an empty bundle
 
-**Cause:** The bundle directory is empty (no records added after init).
+**Cause:** No guard events have been recorded yet (no tool calls, no guard decisions).
 
-**Fix:** Add at least one record before exporting.
+**Fix:** Use the system first — initialize, create snapshots, or run `aegx prove` to generate some records, then export.
 
-### `aegx import` fails with path traversal error
+### Path traversal error during verification
 
 **Cause:** The zip contains entries with `../` in their paths.
 
 **This is a security violation.** The zip was likely crafted maliciously. **Do not trust it.**
 
-### Zip is too large to import
+### Zip is too large to verify
 
 **Cause:** Zip bomb or very large bundle.
 
-**Fix:** Check the zip size before importing:
+**Fix:** Check the zip size before verifying:
 
 ```bash
 unzip -l suspect.aegx.zip | tail -1
 # Check the total uncompressed size
 ```
 
-If the uncompressed size is unreasonable, **do not import it**.
+If the uncompressed size is unreasonable, **do not trust it**.
 
-### Permission denied during import
+### Permission denied during bundle operations
 
-**Cause:** The output directory is not writable.
+**Cause:** The output directory or state directory is not writable.
 
 **Fix:**
 
 ```bash
-ls -la /path/to/parent/
+ls -la ~/.proven/.aer/bundles/
 # Check write permissions
 ```
 
 ---
 
-## 7. Guard Surface Errors (v0.1.6)
+## 6. Guard Surface Errors
 
 ### File read denied for sensitive file
 
 ```
 GuardDecision: DENY — fs-deny-untrusted-sensitive
-  Principal: SKILL, Path: .env, Rule: fs-deny-untrusted-sensitive
+  Principal: Skill, Path: .env, Rule: fs-deny-untrusted-sensitive
 ```
 
-**Cause:** An untrusted principal (SKILL, WEB, CHANNEL, EXTERNAL) attempted to
+**Cause:** An untrusted principal (Skill, Web, Channel, External) attempted to
 read a sensitive file that matches the denied basename pattern.
 
 **This is expected behavior.** The File Read Guard blocks untrusted access to
 credential files. If the read is legitimate, the operation must be initiated by
-a USER or SYS principal.
+a User or Sys principal.
 
 ### Network request blocked
 
 ```
 GuardDecision: DENY — net-deny-blocked-domain
-  Principal: SKILL, URL: https://webhook.site/abc123
+  Principal: Skill, URL: https://webhook.site/abc123
 ```
 
 **Cause:** An outbound request targeted a domain on the blocklist (known
@@ -345,7 +290,7 @@ CRITICAL: No OS-level sandboxing detected
   Compliance: None
 ```
 
-**Cause:** AER detected that the execution environment has no sandbox
+**Cause:** AEGX detected that the execution environment has no sandbox
 protections. Skills can execute arbitrary code without containment.
 
 **Fix:** Run the agent inside a container with seccomp filtering:
@@ -373,6 +318,34 @@ tokens from the system prompt, check that:
 
 This is a platform integration issue — the integration layer must call the
 hook when the system prompt becomes available.
+
+---
+
+## 7. Prove Query Issues
+
+### `Unknown category: <cat>`
+
+**Cause:** Invalid `--category` value for `aegx prove`.
+
+**Fix:** Use one of: `cpi`, `mi`, `taint`, `injection`, `extraction`, `leakage`, `proxy`, `rollback`, `contamination`.
+
+### `Unknown severity: <sev>`
+
+**Cause:** Invalid `--severity` value for `aegx prove`.
+
+**Fix:** Use one of: `critical`, `high`, `medium`, `info`.
+
+### `aegx prove` returns empty results
+
+**Cause:** No guard events have occurred yet, or the time/category/severity filters are too restrictive.
+
+**Fix:** Try without filters first:
+
+```bash
+aegx prove
+```
+
+If that shows results, narrow down with filters. If it shows no results, the system simply hasn't encountered any threats yet — which is good.
 
 ---
 

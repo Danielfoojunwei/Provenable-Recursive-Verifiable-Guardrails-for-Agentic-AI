@@ -18,8 +18,8 @@ limited to:
 
 is the original intellectual property of Daniel Foo Jun Wei / Provenable.ai.
 
-While the source code in this repository is licensed under the Apache License
-2.0, the AEGX format specification itself is provided for reference only.
+While the source code in this repository is licensed under the MIT License,
+the AEGX format specification itself is provided for reference only.
 You may NOT use the AEGX specification to create independent or competing
 implementations of the AEGX format without prior written permission from
 Daniel Foo Jun Wei / Provenable.ai.

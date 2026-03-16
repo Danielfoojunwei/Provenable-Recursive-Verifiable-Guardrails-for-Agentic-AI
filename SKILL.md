@@ -2,7 +2,18 @@
 name: provenable
 description: Provable security guardrails for agentic AI. Audit agent actions, check protection status, query threat alerts, manage snapshots, verify evidence bundles, and enforce CPI/MI guard policies with the unified aegx CLI.
 user-invocable: true
-metadata: {"openclaw":{"emoji":"shield","os":["linux","darwin"],"requires":{"bins":["aegx"]},"install":[{"url":"https://github.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI.git","targetDir":"~/.aegx"}]}}
+metadata:
+  openclaw:
+    emoji: shield
+    os:
+      - linux
+      - darwin
+    requires:
+      bins:
+        - aegx
+    install:
+      - url: https://github.com/Danielfoojunwei/Provenable-Recursive-Verifiable-Guardrails-for-Agentic-AI.git
+        targetDir: ~/.proven
 ---
 
 # Provenable.ai — Provable Security Guardrails for Agentic AI

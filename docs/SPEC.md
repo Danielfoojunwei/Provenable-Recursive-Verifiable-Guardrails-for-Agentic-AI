@@ -8,7 +8,7 @@
 > format without prior written permission from Daniel Foo Jun Wei / Provenable.ai.
 >
 > The source code implementing this specification is separately licensed under
-> Apache License 2.0. See [LICENSE](../LICENSE) and [NOTICE](../NOTICE) for details.
+> MIT License. See [LICENSE](../LICENSE) and [NOTICE](../NOTICE) for details.
 >
 > "Provenable.ai", "AEGX", and "AER" are trademarks of Daniel Foo Jun Wei /
 > Provenable.ai. For licensing inquiries: licensing@provenable.ai

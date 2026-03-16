@@ -251,7 +251,7 @@ my_session.aegx.zip
 
 ## 8. AER Bundle Extensions
 
-AER bundles (exported by `proven-aer bundle export`) include additional files:
+AER bundles (exported by `aegx bundle export`) include additional files:
 
 ```
 incident.aegx.zip
@@ -321,8 +321,8 @@ AER v0.1.6 introduces three new guard surfaces that produce `GuardDecision` reco
 
 - [AEGX v0.1 Specification](SPEC.md) — formal specification
 - [Verification Guide](VERIFICATION_GUIDE.md) — what verify checks
-- [AER Bundle Format](aer-bundle-format.md) — AER-specific details
-- [CPI/MI Guard Rules](aer-cpi-mi-rules.md) — trust lattice and policy
+- [CLI Reference](CLI_REFERENCE.md) — full command reference
+- [Threat Model](THREAT_MODEL.md) — trust lattice and security analysis
 
 
 ---

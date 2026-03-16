@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "aegx")]
 #[command(about = "AEGX — Provenable Recursive Verifiable Guardrails for Agentic AI")]
-#[command(version = "0.1.0")]
+#[command(version = "0.2.0")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,

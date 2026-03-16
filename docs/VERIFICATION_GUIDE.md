@@ -20,14 +20,8 @@ This document explains exactly what `aegx verify` checks, in what order, and how
 ## 1. Quick Verification
 
 ```bash
-# Verify a bundle directory
-aegx verify my_session.aegx
-
-# Verify a zip (import first)
-aegx import my_session.aegx.zip /tmp/check && aegx verify /tmp/check
-
-# Verify an AER evidence bundle
-proven-aer verify incident.aegx.zip
+# Verify an evidence bundle
+aegx verify my_bundle.aegx.zip
 ```
 
 If the output is `Verification: PASS` and the exit code is `0`, the bundle is intact.
@@ -253,10 +247,10 @@ fi
 
 ## 5. Verifying AER Bundles
 
-AER bundles (`.aegx.zip` files exported by `proven-aer bundle export`) are verified with:
+AER bundles (`.aegx.zip` files exported by `aegx bundle export`) are verified with:
 
 ```bash
-proven-aer verify path/to/bundle.aegx.zip
+aegx verify path/to/bundle.aegx.zip
 ```
 
 This runs the same checks plus AER-specific validations:
