@@ -1,4 +1,4 @@
-# Provenable.ai — Recursive Verifiable Guardrails for Agentic AI
+# Provenable: Recursive Verifiable Guardrails for Agentic AI
 
 Structural security enforcement for agentic AI systems. This project provides a
 **unified Rust workspace** implementing four formal theorems (CPI, MI,
